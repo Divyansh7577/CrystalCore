@@ -1,0 +1,20 @@
+# CrystalCore Configuration
+#
+# Amethyst Shard is the server's main currency ("Crystal").
+# Both /pay and /buy use it by default. Changing these to another
+# material is supported, but the auto-rename-to-"Crystal" feature
+# below only affects AMETHYST_SHARD.
+
+pay-currency-item: AMETHYST_SHARD
+buy-currency-item: AMETHYST_SHARD
+
+# If true, CrystalCore will automatically rename every Amethyst Shard
+# on the server (in player inventories, on pickup, and on join) to
+# display as "Crystal" with custom lore, so the whole server's
+# Amethyst Shard supply reads as the unified currency item.
+rename-amethyst-to-crystal: true
+
+# How often (in ticks, 20 ticks = 1 second) the background task scans
+# online players' inventories to catch any un-renamed Amethyst Shards
+# (e.g. mined directly from Amethyst Clusters).
+rename-scan-interval-ticks: 100
