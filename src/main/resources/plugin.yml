@@ -1,0 +1,73 @@
+name: CrystalCore
+version: 1.4.0
+main: com.crystalville.crystalcore.CrystalCore
+api-version: '1.20'
+author: Divyansh7577
+description: Core plugin for Crystal Ville SMP - Crystal economy, shop, roles, anti-theft chest logging, hole filler, and 3D Logo holograms.
+
+commands:
+  pay:
+    description: Pay another player using Crystals (works online or offline).
+    usage: /pay <player> <amount>
+    permission: crystalcore.pay
+    permission-message: "&cYou don't have permission to use /pay."
+  buy:
+    description: Buy items from the shop (Market Minister only) or check prices.
+    usage: /buy <item> <quantity>  |  /buy info <item>
+    permission: crystalcore.buy
+    permission-message: "&cYou don't have permission to use /buy."
+  sell:
+    description: Sell items to the shop for Crystals, or check sell prices.
+    usage: /sell <item> <quantity>  |  /sell info <item>
+    permission: crystalcore.sell
+    permission-message: "&cYou don't have permission to use /sell."
+  rank:
+    description: Set a player's custom rank name and color. OP only.
+    usage: /rank <player> <rankname> <colour>
+    permission: crystalcore.rank
+    permission-message: "&cOnly OPs can use /rank."
+  role:
+    description: Assign a pre-built role (e.g. Market Minister) to a player. OP only.
+    usage: /role <player> <role name>
+    permission: crystalcore.role
+    permission-message: "&cOnly OPs can use /role."
+  logo:
+    description: Spawn or remove a 3D floating text logo. OP only.
+    usage: /logo <text...> | /logo remove
+    permission: crystalcore.logo
+    permission-message: "&cOnly OPs can use /logo."
+  claim:
+    description: Claim pending Crystals from a payment that couldn't fit in your inventory.
+    usage: /claim <amount>
+    permission: crystalcore.claim
+    permission-message: "&cYou don't have permission to use /claim."
+  i:
+    description: Toggle Chest Inspector Mode (anti-theft chest logging). OP only.
+    usage: /i
+    permission: crystalcore.inspect
+    permission-message: "&cOnly OPs can use /i."
+  holefiller:
+    description: Toggle Hole Filler Mode. OP only.
+    usage: /holefiller [on|off|material]
+    permission: crystalcore.holefiller
+    permission-message: "&cOnly OPs can use /holefiller."
+
+permissions:
+  crystalcore.pay:
+    default: true
+  crystalcore.buy:
+    default: true
+  crystalcore.sell:
+    default: true
+  crystalcore.rank:
+    default: op
+  crystalcore.role:
+    default: op
+  crystalcore.logo:
+    default: op
+  crystalcore.claim:
+    default: true
+  crystalcore.inspect:
+    default: op
+  crystalcore.holefiller:
+    default: op
