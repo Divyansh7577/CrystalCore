@@ -243,4 +243,4 @@ shop:
   CONDUIT: {buy: 5000, sell: 3000}
   HEART_OF_THE_SEA: {buy: 2500, sell: 1500}
   ENCHANTED_GOLDEN_APPLE: {buy: 4000, sell: 2500}
-}
+
