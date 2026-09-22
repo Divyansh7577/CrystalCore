@@ -1,5 +1,6 @@
 package com.crystalville.crystalcore;
 
+import com.crystalville.crystalcore.commands.BankCommand;
 import com.crystalville.crystalcore.commands.BuyCommand;
 import com.crystalville.crystalcore.commands.ClaimCommand;
 import com.crystalville.crystalcore.commands.DraftCommand;
@@ -15,10 +16,13 @@ import com.crystalville.crystalcore.commands.RoleCommand;
 import com.crystalville.crystalcore.commands.WebLinkCommand;
 import com.crystalville.crystalcore.commands.SellCommand;
 import com.crystalville.crystalcore.commands.ShopCommand;
+import com.crystalville.crystalcore.gui.BankGuiManager;
 import com.crystalville.crystalcore.listeners.AntiTheftListener;
+import com.crystalville.crystalcore.listeners.BankGuiListener;
 import com.crystalville.crystalcore.listeners.CrystalListener;
 import com.crystalville.crystalcore.listeners.HoleFillerListener;
 import com.crystalville.crystalcore.listeners.HudListener;
+import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.ChestLogManager;
 import com.crystalville.crystalcore.managers.CrystalRenameTask;
 import com.crystalville.crystalcore.managers.HoleFillerManager;
@@ -46,6 +50,8 @@ public final class CrystalCore extends JavaPlugin {
     private HudManager hudManager;
     private StatsManager statsManager;
     private WebStatsSyncManager webStatsSyncManager;
+    private BankManager bankManager;
+    private BankGuiManager bankGuiManager;
     private HudListener hudListener;
     private Material payCurrency;
     private Material buyCurrency;
@@ -89,17 +95,23 @@ public final class CrystalCore extends JavaPlugin {
 
         this.webStatsSyncManager = new WebStatsSyncManager(this);
 
+        this.bankManager = new BankManager(this);
+        this.bankManager.load();
+
+        this.bankGuiManager = new BankGuiManager(bankManager, rankManager);
+
         this.hudListener = new HudListener(
                 this,
                 hudManager,
                 rankManager,
                 statsManager,
-                webStatsSyncManager
+                webStatsSyncManager,
+                bankManager
         );
 
         getCommand("pay").setExecutor(new PayCommand(this));
         getCommand("buy").setExecutor(new BuyCommand(shopManager, rankManager));
-        getCommand("sell").setExecutor(new SellCommand(shopManager));
+        getCommand("sell").setExecutor(new SellCommand(shopManager, bankManager, rankManager));
         getCommand("rank").setExecutor(new RankCommand(this, rankManager));
         getCommand("role").setExecutor(new RoleCommand(rankManager));
         getCommand("logo").setExecutor(new LogoCommand());
@@ -112,6 +124,7 @@ public final class CrystalCore extends JavaPlugin {
         getCommand("hud").setExecutor(new HudCommand(hudManager, hudListener));
         getCommand("edit").setExecutor(new EditHudCommand(hudManager, hudListener));
         getCommand("cvlink").setExecutor(new WebLinkCommand(this));
+        getCommand("bank").setExecutor(new BankCommand(bankManager, bankGuiManager));
 
         getServer().getPluginManager().registerEvents(
                 new CrystalListener(rankManager, mailboxManager),
@@ -129,6 +142,7 @@ public final class CrystalCore extends JavaPlugin {
         );
 
         getServer().getPluginManager().registerEvents(hudListener, this);
+        getServer().getPluginManager().registerEvents(new BankGuiListener(bankGuiManager, bankManager), this);
 
         if (getConfig().getBoolean("rename-amethyst-to-crystal", true)) {
             long interval = getConfig().getLong(
@@ -202,6 +216,10 @@ public final class CrystalCore extends JavaPlugin {
             statsManager.save();
         }
 
+        if (bankManager != null) {
+            bankManager.save();
+        }
+
         getLogger().info("CrystalCore has been disabled.");
     }
 
@@ -229,7 +247,11 @@ public final class CrystalCore extends JavaPlugin {
         return statsManager;
     }
 
+    public BankManager getBankManager() {
+        return bankManager;
+    }
+
     public Material getBuyCurrency() {
         return buyCurrency;
     }
-  }
+    }
