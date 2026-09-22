@@ -3,7 +3,6 @@ package com.crystalville.crystalcore.managers;
 import com.crystalville.crystalcore.CrystalCore;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,7 +10,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/** Syncs live Minecraft player data to the linked Crystal Ville web profile. */
+/**
+ * Syncs live Minecraft player data to the linked Crystal Ville web profile.
+ * The synced "balance" is the player's TOTAL Crystals: inventory + ender
+ * chest + Crystal Bank balance combined - the same figure shown on the HUD.
+ */
 public final class WebStatsSyncManager {
     private final CrystalCore plugin;
     private final HttpClient http = HttpClient.newBuilder()
@@ -33,7 +36,7 @@ public final class WebStatsSyncManager {
 
         StatsManager stats = plugin.getStatsManager();
         RankManager ranks = plugin.getRankManager();
-        long balance = countCrystals(player);
+        long balance = CrystalItemUtil.getTotalCrystals(player, plugin.getBankManager());
         long playtimeMinutes = stats.getLivePlaytimeSeconds(player.getUniqueId()) / 60L;
         long kills = stats.getKills(player.getUniqueId());
         long deaths = stats.getDeaths(player.getUniqueId());
@@ -77,18 +80,8 @@ public final class WebStatsSyncManager {
         });
     }
 
-    private long countCrystals(Player player) {
-        long total = 0;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && item.getType() == CrystalItemUtil.CURRENCY_MATERIAL) {
-                total += item.getAmount();
-            }
-        }
-        return total;
-    }
-
     private static String escape(String value) {
         if (value == null) return "";
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
-          }
+}
