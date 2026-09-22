@@ -1,5 +1,6 @@
 package com.crystalville.crystalcore.listeners;
 
+import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.HudManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.managers.StatsManager;
@@ -31,8 +32,8 @@ import java.util.Date;
 
 /**
  * Builds and maintains the "Crystal Ville" scoreboard-sidebar HUD:
- * join date, rank, Crystal balance, kills, deaths, playtime, and each
- * player's own editable footer credit line.
+ * join date, rank, total Crystal balance (inventory + ender chest + bank),
+ * kills, deaths, playtime, and each player's own editable footer line.
  */
 public class HudListener implements Listener {
 
@@ -46,19 +47,22 @@ public class HudListener implements Listener {
     private final RankManager rankManager;
     private final StatsManager statsManager;
     private final WebStatsSyncManager webStatsSyncManager;
+    private final BankManager bankManager;
 
     public HudListener(
             JavaPlugin plugin,
             HudManager hudManager,
             RankManager rankManager,
             StatsManager statsManager,
-            WebStatsSyncManager webStatsSyncManager
+            WebStatsSyncManager webStatsSyncManager,
+            BankManager bankManager
     ) {
         this.plugin = plugin;
         this.hudManager = hudManager;
         this.rankManager = rankManager;
         this.statsManager = statsManager;
         this.webStatsSyncManager = webStatsSyncManager;
+        this.bankManager = bankManager;
     }
 
     @EventHandler
@@ -318,19 +322,9 @@ public class HudListener implements Listener {
                 );
     }
 
+    /** Shows the player's TOTAL Crystals: inventory + ender chest + bank balance combined. */
     private Component crystalsLine(Player player) {
-        int total = 0;
-
-        for (ItemStack item :
-                player.getInventory().getContents()) {
-
-            if (item != null
-                    && item.getType()
-                    == CrystalItemUtil.CURRENCY_MATERIAL) {
-
-                total += item.getAmount();
-            }
-        }
+        long total = CrystalItemUtil.getTotalCrystals(player, bankManager);
 
         return Component.text(
                         "Crystals: ",
@@ -447,4 +441,4 @@ public class HudListener implements Listener {
         return first.toString()
                 + second.toString();
     }
-  }
+}
