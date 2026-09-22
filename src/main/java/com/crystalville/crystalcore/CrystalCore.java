@@ -5,12 +5,14 @@ import com.crystalville.crystalcore.commands.BuyCommand;
 import com.crystalville.crystalcore.commands.ClaimCommand;
 import com.crystalville.crystalcore.commands.DraftCommand;
 import com.crystalville.crystalcore.commands.EditHudCommand;
+import com.crystalville.crystalcore.commands.EnterpriseCommand;
 import com.crystalville.crystalcore.commands.HoleFillerCommand;
 import com.crystalville.crystalcore.commands.HudCommand;
 import com.crystalville.crystalcore.commands.InspectCommand;
 import com.crystalville.crystalcore.commands.InventoryCommand;
 import com.crystalville.crystalcore.commands.LogoCommand;
 import com.crystalville.crystalcore.commands.PayCommand;
+import com.crystalville.crystalcore.commands.PayEnterpriseCommand;
 import com.crystalville.crystalcore.commands.RankCommand;
 import com.crystalville.crystalcore.commands.RoleCommand;
 import com.crystalville.crystalcore.commands.WebLinkCommand;
@@ -25,6 +27,8 @@ import com.crystalville.crystalcore.listeners.HudListener;
 import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.ChestLogManager;
 import com.crystalville.crystalcore.managers.CrystalRenameTask;
+import com.crystalville.crystalcore.managers.EnterpriseManager;
+import com.crystalville.crystalcore.managers.EnterprisePaymentConfirmationManager;
 import com.crystalville.crystalcore.managers.HoleFillerManager;
 import com.crystalville.crystalcore.managers.HudManager;
 import com.crystalville.crystalcore.managers.InspectorManager;
@@ -52,6 +56,8 @@ public final class CrystalCore extends JavaPlugin {
     private WebStatsSyncManager webStatsSyncManager;
     private BankManager bankManager;
     private BankGuiManager bankGuiManager;
+    private EnterpriseManager enterpriseManager;
+    private EnterprisePaymentConfirmationManager enterprisePaymentConfirmationManager;
     private HudListener hudListener;
     private Material payCurrency;
     private Material buyCurrency;
@@ -100,6 +106,11 @@ public final class CrystalCore extends JavaPlugin {
 
         this.bankGuiManager = new BankGuiManager(bankManager, rankManager);
 
+        this.enterpriseManager = new EnterpriseManager(this);
+        this.enterpriseManager.load();
+
+        this.enterprisePaymentConfirmationManager = new EnterprisePaymentConfirmationManager();
+
         this.hudListener = new HudListener(
                 this,
                 hudManager,
@@ -125,6 +136,9 @@ public final class CrystalCore extends JavaPlugin {
         getCommand("edit").setExecutor(new EditHudCommand(hudManager, hudListener));
         getCommand("cvlink").setExecutor(new WebLinkCommand(this));
         getCommand("bank").setExecutor(new BankCommand(bankManager, bankGuiManager));
+        getCommand("enterprise").setExecutor(new EnterpriseCommand(enterpriseManager, bankManager, rankManager));
+        getCommand("payenterprise").setExecutor(
+                new PayEnterpriseCommand(enterpriseManager, enterprisePaymentConfirmationManager));
 
         getServer().getPluginManager().registerEvents(
                 new CrystalListener(rankManager, mailboxManager),
@@ -220,6 +234,10 @@ public final class CrystalCore extends JavaPlugin {
             bankManager.save();
         }
 
+        if (enterpriseManager != null) {
+            enterpriseManager.save();
+        }
+
         getLogger().info("CrystalCore has been disabled.");
     }
 
@@ -251,7 +269,11 @@ public final class CrystalCore extends JavaPlugin {
         return bankManager;
     }
 
+    public EnterpriseManager getEnterpriseManager() {
+        return enterpriseManager;
+    }
+
     public Material getBuyCurrency() {
         return buyCurrency;
     }
-    }
+}
