@@ -17,7 +17,7 @@ import java.util.UUID;
 
 /**
  * Stores and applies per-player rank name + color, and pre-built server "roles"
- * (e.g. Market Minister) which grant special command permissions.
+ * (e.g. Market Minister, Finance Minister) which grant special command permissions.
  */
 public class RankManager {
 
@@ -40,6 +40,8 @@ public class RankManager {
     static {
         PREDEFINED_ROLES.put("MARKET_MINISTER",
                 new RoleDefinition("MARKET_MINISTER", "Market Minister", "#20B2AA"));
+        PREDEFINED_ROLES.put("FINANCE_MINISTER",
+                new RoleDefinition("FINANCE_MINISTER", "Finance Minister", "#FFD700"));
     }
 
     /** Looks up a predefined role by its display name (case-insensitive, spaces or underscores). */
@@ -128,7 +130,7 @@ public class RankManager {
         saveRanks();
     }
 
-    /** Assigns a pre-built role (e.g. Market Minister) to a player: sets its fixed name/color and role key. */
+    /** Assigns a pre-built role (e.g. Market Minister, Finance Minister) to a player. */
     public void assignRole(OfflinePlayer target, RoleDefinition role) {
         UUID uuid = target.getUniqueId();
         rankNames.put(uuid, role.displayName);
@@ -187,4 +189,4 @@ public class RankManager {
         String name = getRankName(uuid);
         return Component.text("[" + name + "] ", color);
     }
-  }
+        }    
