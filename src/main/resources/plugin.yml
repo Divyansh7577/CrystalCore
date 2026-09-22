@@ -1,9 +1,9 @@
 name: CrystalCore
-version: 1.9.0
+version: 1.10.0
 main: com.crystalville.crystalcore.CrystalCore
 api-version: '1.20'
 author: Divyansh7577
-description: Core plugin for Crystal Ville SMP - Crystal economy, bank, shop, roles, anti-theft chest logging, hole filler, HUD, and 3D Logo holograms.
+description: Core plugin for Crystal Ville SMP - Crystal economy, personal and Enterprise banking, shop, roles, anti-theft chest logging, hole filler, HUD, and 3D Logo holograms.
 
 commands:
   pay:
@@ -82,10 +82,20 @@ commands:
     permission: crystalcore.cvlink
     permission-message: "&cYou don't have permission to use /cvlink."
   bank:
-    description: Manage your Crystal Bank (capped at 10,000 for normal players; unlimited for Finance Minister/OP).
+    description: Manage your personal Crystal Bank (capped at 10,000 for normal players; unlimited for Finance Minister/OP).
     usage: /bank balance | /bank add <amount> | /bank withdraw <amount> | /bank gui
     permission: crystalcore.bank
     permission-message: "&cYou don't have permission to use /bank."
+  enterprise:
+    description: Create and manage an Enterprise Bank account for your company.
+    usage: /enterprise create|info|balance|deposit|withdraw|add|remove|setperms|members|history|list
+    permission: crystalcore.enterprise
+    permission-message: "&cYou don't have permission to use /enterprise."
+  payenterprise:
+    description: Pay an Enterprise Bank directly using its Enterprise ID (UPI-style).
+    usage: /payenterprise <EnterpriseID> <amount>  |  /payenterprise confirm  |  /payenterprise cancel
+    permission: crystalcore.payenterprise
+    permission-message: "&cYou don't have permission to use /payenterprise."
 
 permissions:
   crystalcore.pay:
@@ -119,4 +129,8 @@ permissions:
   crystalcore.cvlink:
     default: true
   crystalcore.bank:
+    default: true
+  crystalcore.enterprise:
+    default: true
+  crystalcore.payenterprise:
     default: true
