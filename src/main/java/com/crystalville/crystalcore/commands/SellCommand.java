@@ -1,5 +1,7 @@
 package com.crystalville.crystalcore.commands;
 
+import com.crystalville.crystalcore.managers.BankManager;
+import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
@@ -22,13 +24,25 @@ import java.util.Map;
  *
  * Open to all players. Sell price is always lower than buy price
  * (see config.yml "shop" section) to maintain a healthy SMP economy.
+ *
+ * If the player's inventory doesn't have room for all the Crystals earned,
+ * the overflow is deposited straight into their Crystal Bank (respecting
+ * the normal bank cap) instead of being dropped on the ground. Only if
+ * BOTH the inventory AND the bank are full does anything actually drop,
+ * as a last-resort safety net so nothing is ever silently lost.
  */
 public class SellCommand implements CommandExecutor {
 
-    private final ShopManager shopManager;
+    private static final String FINANCE_MINISTER_ROLE = "FINANCE_MINISTER";
 
-    public SellCommand(ShopManager shopManager) {
+    private final ShopManager shopManager;
+    private final BankManager bankManager;
+    private final RankManager rankManager;
+
+    public SellCommand(ShopManager shopManager, BankManager bankManager, RankManager rankManager) {
         this.shopManager = shopManager;
+        this.bankManager = bankManager;
+        this.rankManager = rankManager;
     }
 
     @Override
@@ -136,10 +150,48 @@ public class SellCommand implements CommandExecutor {
         int totalPayout = sellPrice * quantity;
 
         removeItems(player.getInventory(), material, quantity);
-        giveCrystals(player, totalPayout);
+        payoutCrystals(player, totalPayout);
 
         player.sendMessage(Component.text("Sold " + quantity + "x " + prettyName(material)
                 + " for " + totalPayout + " Crystal(s).", NamedTextColor.GREEN));
+    }
+
+    /**
+     * Pays out `totalAmount` Crystals to the player: as much as fits directly
+     * into their inventory, any remainder into their Crystal Bank, and only
+     * whatever still doesn't fit (bank also full/capped) gets dropped on the
+     * ground as an absolute last resort.
+     */
+    private void payoutCrystals(Player player, int totalAmount) {
+        int inventoryCapacity = CrystalItemUtil.freeCapacity(player);
+        int toInventory = Math.min(totalAmount, inventoryCapacity);
+        int remainder = totalAmount - toInventory;
+
+        if (toInventory > 0) {
+            giveCrystalsToInventory(player, toInventory);
+        }
+
+        if (remainder <= 0) {
+            return;
+        }
+
+        boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
+        int stillOverflow = remainder - (int) depositedToBank;
+
+        if (depositedToBank > 0) {
+            player.sendMessage(Component.text(
+                    "Your inventory was full - " + depositedToBank + " Crystal(s) were deposited into your bank.",
+                    NamedTextColor.AQUA));
+        }
+
+        if (stillOverflow > 0) {
+            // Both inventory and bank are full/capped - drop the remainder so nothing is lost.
+            dropCrystals(player, stillOverflow);
+            player.sendMessage(Component.text(
+                    "Your bank is also full - " + stillOverflow + " Crystal(s) were dropped at your feet.",
+                    NamedTextColor.YELLOW));
+        }
     }
 
     private Material resolveMaterial(String query) {
@@ -184,20 +236,34 @@ public class SellCommand implements CommandExecutor {
         }
     }
 
-    private void giveCrystals(Player player, int amount) {
+    /** Gives Crystals directly into the inventory. Caller guarantees this amount fits. */
+    private void giveCrystalsToInventory(Player player, int amount) {
         int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        Map<Integer, ItemStack> overflow = new HashMap<>();
         int remaining = amount;
 
         while (remaining > 0) {
             int stackSize = Math.min(remaining, maxStack);
             ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
+            // No overflow handling needed here - freeCapacity() already guaranteed this fits.
+            player.getInventory().addItem(stack);
+            remaining -= stackSize;
+        }
+    }
+
+    private void dropCrystals(Player player, int amount) {
+        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
+        int remaining = amount;
+        Map<Integer, ItemStack> overflow = new HashMap<>();
+
+        while (remaining > 0) {
+            int stackSize = Math.min(remaining, maxStack);
+            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
+            overflow.put(overflow.size(), stack);
             remaining -= stackSize;
         }
 
-        for (ItemStack leftover : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        for (ItemStack stack : overflow.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), stack);
         }
     }
-}
+                        } 
