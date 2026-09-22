@@ -1,5 +1,6 @@
 package com.crystalville.crystalcore.util;
 
+import com.crystalville.crystalcore.managers.BankManager;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -84,4 +85,39 @@ public final class CrystalItemUtil {
         }
         return capacity;
     }
-}
+
+    /** Counts Crystals sitting in the player's main inventory only (no ender chest, no bank). */
+    public static long countInventoryCrystals(Player player) {
+        long total = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == CURRENCY_MATERIAL) {
+                total += item.getAmount();
+            }
+        }
+        return total;
+    }
+
+    /** Counts Crystals sitting in the player's ender chest only. */
+    public static long countEnderChestCrystals(Player player) {
+        long total = 0;
+        for (ItemStack item : player.getEnderChest().getContents()) {
+            if (item != null && item.getType() == CURRENCY_MATERIAL) {
+                total += item.getAmount();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * The single source of truth for a player's "total Crystals": physical
+     * inventory + ender chest + Crystal Bank balance combined. Used by both
+     * the HUD display and the website stats sync, so the two never disagree.
+     */
+    public static long getTotalCrystals(Player player, BankManager bankManager) {
+        long total = countInventoryCrystals(player) + countEnderChestCrystals(player);
+        if (bankManager != null) {
+            total += bankManager.getBalance(player.getUniqueId());
+        }
+        return total;
+    }
+    }
