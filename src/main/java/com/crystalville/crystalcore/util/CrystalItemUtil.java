@@ -10,7 +10,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 public final class CrystalItemUtil {
 
@@ -120,4 +123,39 @@ public final class CrystalItemUtil {
         }
         return total;
     }
+
+    /**
+     * Gives `amount` Crystals to a player: as many as fit directly into
+     * their inventory, split correctly into full 64-stacks plus a final
+     * partial stack, with any true overflow (inventory completely full)
+     * dropped at their feet so nothing is ever silently lost.
+     *
+     * BUGFIX: earlier versions of this logic across the plugin collected
+     * leftover items from repeated Inventory#addItem() calls into a
+     * Map<Integer, ItemStack>. Bukkit's addItem() always returns leftovers
+     * keyed starting at index 0 on EVERY call, so each loop iteration's
+     * putAll() silently overwrote (destroyed) the previous iteration's
+     * leftover stack at the same key. This is why a withdrawal of 800
+     * Crystals could result in far fewer actually reaching the player once
+     * their inventory filled up partway through. Using a List instead of a
+     * Map (as done here) has no such key collision - every leftover stack
+     * from every iteration is preserved and dropped on the ground.
+     */
+    public static void giveCrystals(Player player, long amount) {
+        int maxStack = CURRENCY_MATERIAL.getMaxStackSize();
+        long remaining = amount;
+        List<ItemStack> overflow = new ArrayList<>();
+
+        while (remaining > 0) {
+            int stackSize = (int) Math.min(remaining, maxStack);
+            ItemStack stack = createCrystal(stackSize);
+            Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+            overflow.addAll(leftover.values());
+            remaining -= stackSize;
+        }
+
+        for (ItemStack stack : overflow) {
+            player.getWorld().dropItemNaturally(player.getLocation(), stack);
+        }
     }
+            }
