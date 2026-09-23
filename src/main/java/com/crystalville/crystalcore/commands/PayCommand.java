@@ -14,9 +14,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * /pay <player> <amount>
  *
@@ -96,7 +93,7 @@ public class PayCommand implements CommandExecutor {
         if (!targetOffline) {
             int capacity = CrystalItemUtil.freeCapacity(onlineTarget);
             if (capacity >= amount) {
-                giveCrystals(onlineTarget, amount);
+                CrystalItemUtil.giveCrystals(onlineTarget, amount);
                 onlineTarget.sendMessage(Component.text(
                         "You received " + amount + " Crystal(s) from " + payer.getName() + ".",
                         NamedTextColor.GREEN));
@@ -159,21 +156,4 @@ public class PayCommand implements CommandExecutor {
             }
         }
     }
-
-    private void giveCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        Map<Integer, ItemStack> overflow = new HashMap<>();
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
-            remaining -= stackSize;
-        }
-
-        for (ItemStack leftover : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
-    }
-  }
+}
