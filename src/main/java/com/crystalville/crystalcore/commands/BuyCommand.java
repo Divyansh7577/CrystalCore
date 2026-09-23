@@ -13,8 +13,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -200,20 +201,28 @@ public class BuyCommand implements CommandExecutor {
         }
     }
 
+    /**
+     * BUGFIX: previously collected overflow into a Map<Integer, ItemStack>,
+     * whose keys always start at 0 on every addItem() call - each loop
+     * iteration's leftovers silently overwrote the previous iteration's,
+     * destroying items instead of dropping them once the inventory filled.
+     * Using a List here preserves every leftover stack correctly.
+     */
     private void giveItems(Player player, Material material, int amount) {
         int maxStack = material.getMaxStackSize();
-        Map<Integer, ItemStack> overflow = new HashMap<>();
+        List<ItemStack> overflow = new ArrayList<>();
         int remaining = amount;
 
         while (remaining > 0) {
             int stackSize = Math.min(remaining, maxStack);
             ItemStack stack = new ItemStack(material, stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
+            Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
+            overflow.addAll(leftover.values());
             remaining -= stackSize;
         }
 
-        for (ItemStack leftover : overflow.values()) {
+        for (ItemStack leftover : overflow) {
             player.getWorld().dropItemNaturally(player.getLocation(), leftover);
         }
     }
-  }
+    }
