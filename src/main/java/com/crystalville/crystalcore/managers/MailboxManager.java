@@ -6,8 +6,6 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,13 +34,13 @@ public class MailboxManager {
         }
     }
 
-    private final JavaPlugin plugin;
+    private final org.bukkit.plugin.java.JavaPlugin plugin;
     private final File mailboxFile;
     private FileConfiguration mailboxConfig;
 
     private final Map<UUID, List<PendingPayment>> pendingPayments = new HashMap<>();
 
-    public MailboxManager(JavaPlugin plugin) {
+    public MailboxManager(org.bukkit.plugin.java.JavaPlugin plugin) {
         this.plugin = plugin;
         this.mailboxFile = new File(plugin.getDataFolder(), "mailbox.yml");
     }
@@ -195,7 +193,9 @@ public class MailboxManager {
             totalAmount += payment.amount;
         }
 
-        giveCrystals(player, totalAmount);
+        // Delivers the FULL amount: into inventory where it fits, dropped at
+        // the player's feet for any true overflow. Nothing is lost.
+        CrystalItemUtil.giveCrystals(player, totalAmount);
 
         player.sendMessage(Component.text(
                 "While you were offline, you received Crystals from:", NamedTextColor.GREEN));
@@ -208,21 +208,4 @@ public class MailboxManager {
 
         save();
     }
-
-    private void giveCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        Map<Integer, ItemStack> overflow = new HashMap<>();
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
-            remaining -= stackSize;
-        }
-
-        for (ItemStack leftover : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
-    }
-  }
+            }
