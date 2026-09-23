@@ -18,7 +18,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -201,27 +200,13 @@ public class BankGuiListener implements Listener {
             return;
         }
 
-        giveCrystals(player, (int) withdrawn);
+        // Delivers the FULL withdrawn amount: into inventory where it fits,
+        // dropped at the player's feet for any true overflow. Nothing is lost.
+        CrystalItemUtil.giveCrystals(player, withdrawn);
+
         player.sendMessage(Component.text(
                 "Withdrew " + withdrawn + " Crystal(s) from your bank.", NamedTextColor.GREEN));
 
         bankGuiManager.refreshBalance(inv, player);
     }
-
-    private void giveCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        Map<Integer, ItemStack> overflow = new HashMap<>();
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
-            remaining -= stackSize;
-        }
-
-        for (ItemStack leftover : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
     }
-            }
