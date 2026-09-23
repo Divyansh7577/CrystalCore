@@ -8,13 +8,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * /claim <amount>
+ * /bank... wait, this is /claim <amount>
  * Withdraws up to <amount> Crystals from the player's pending balance
  * (built up from /pay when their inventory was too full to receive it
  * directly, or from offline payments). Only claims what actually fits
@@ -72,7 +68,7 @@ public class ClaimCommand implements CommandExecutor {
         int actualClaim = Math.min(wanted, capacity);
         int deducted = mailboxManager.deductPending(player.getUniqueId(), actualClaim);
 
-        giveCrystals(player, deducted);
+        CrystalItemUtil.giveCrystals(player, deducted);
 
         player.sendMessage(Component.text("Claimed " + deducted + " Crystal(s).", NamedTextColor.GREEN));
 
@@ -85,21 +81,4 @@ public class ClaimCommand implements CommandExecutor {
 
         return true;
     }
-
-    private void giveCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        Map<Integer, ItemStack> overflow = new HashMap<>();
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.putAll(player.getInventory().addItem(stack));
-            remaining -= stackSize;
-        }
-
-        for (ItemStack leftover : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-        }
-    }
-          }
+                }
