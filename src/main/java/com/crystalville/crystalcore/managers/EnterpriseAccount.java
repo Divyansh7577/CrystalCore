@@ -7,21 +7,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * A single company's Enterprise Bank: its ID, name, owner, balance (capped
- * at MAX_BALANCE), members with individual permissions, and a rolling
- * transaction history. The owner always has every permission implicitly -
- * only non-owner members are checked against their assigned permission set.
- */
 public final class EnterpriseAccount {
 
-    public static final long MAX_BALANCE = 200_000L;
+    public static final long DEFAULT_MAX_BALANCE = 200_000L;
     private static final int MAX_HISTORY_ENTRIES = 50;
 
     public final String enterpriseId;
     public String name;
     public final UUID ownerUuid;
     public long balance;
+    public long maxBalance;
     public final Map<UUID, Set<EnterprisePermission>> members = new LinkedHashMap<>();
     public final List<EnterpriseTransaction> history = new ArrayList<>();
 
@@ -30,6 +25,7 @@ public final class EnterpriseAccount {
         this.name = name;
         this.ownerUuid = ownerUuid;
         this.balance = 0L;
+        this.maxBalance = DEFAULT_MAX_BALANCE;
     }
 
     public boolean isOwner(UUID uuid) {
@@ -55,18 +51,17 @@ public final class EnterpriseAccount {
         }
     }
 
-    /** Adds to balance, capped at MAX_BALANCE. Returns the amount actually added. */
+    /** Adds to balance, capped at maxBalance (which can be raised via /enterprise increase). */
     public long addBalance(long amount) {
-        long room = Math.max(0, MAX_BALANCE - balance);
+        long room = Math.max(0, maxBalance - balance);
         long added = Math.min(amount, room);
         balance += added;
         return added;
     }
 
-    /** Removes from balance. Returns the amount actually removed (never more than available). */
     public long removeBalance(long amount) {
         long removed = Math.min(amount, balance);
         balance -= removed;
         return removed;
     }
-  }
+}
