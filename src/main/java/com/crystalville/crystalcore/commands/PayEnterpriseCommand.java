@@ -2,11 +2,9 @@ package com.crystalville.crystalcore.commands;
 
 import com.crystalville.crystalcore.managers.EnterpriseAccount;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
-import com.crystalville.crystalcore.managers.EnterprisePaymentConfirmationManager;
 import com.crystalville.crystalcore.managers.EnterprisePermission;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -21,24 +19,17 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * /payenterprise <EnterpriseID> <amount>  - pay an Enterprise Bank directly (UPI-style)
- * /payenterprise confirm                  - confirms a pending payment
- * /payenterprise cancel                   - cancels a pending payment
- *
- * Open to every player. Requires confirmation before completion to prevent
- * accidental transfers. OPs bypass their own inventory cost (infinite
- * send), matching the rest of CrystalCore's economy. The Enterprise's
- * 200,000 Crystal cap always applies regardless of who is paying.
+ * /payenterprise <EnterpriseID> <amount>
+ * Pays an Enterprise Bank directly (UPI-style), instantly. Open to every
+ * player. OPs bypass their own inventory cost. The Enterprise's balance
+ * cap (default 200,000, raisable via /enterprise increase) always applies.
  */
 public class PayEnterpriseCommand implements CommandExecutor {
 
     private final EnterpriseManager enterpriseManager;
-    private final EnterprisePaymentConfirmationManager confirmationManager;
 
-    public PayEnterpriseCommand(EnterpriseManager enterpriseManager,
-                                 EnterprisePaymentConfirmationManager confirmationManager) {
+    public PayEnterpriseCommand(EnterpriseManager enterpriseManager) {
         this.enterpriseManager = enterpriseManager;
-        this.confirmationManager = confirmationManager;
     }
 
     @Override
@@ -49,60 +40,39 @@ public class PayEnterpriseCommand implements CommandExecutor {
         }
         Player player = (Player) sender;
 
-        if (args.length == 0) {
-            player.sendMessage(Component.text("Usage: /payenterprise <EnterpriseID> <amount>", NamedTextColor.RED));
-            return true;
-        }
-
-        if (args[0].equalsIgnoreCase("confirm")) {
-            handleConfirm(player);
-            return true;
-        }
-
-        if (args[0].equalsIgnoreCase("cancel")) {
-            confirmationManager.clear(player.getUniqueId());
-            player.sendMessage(Component.text("Payment cancelled.", NamedTextColor.YELLOW));
-            return true;
-        }
-
         if (args.length < 2) {
             player.sendMessage(Component.text("Usage: /payenterprise <EnterpriseID> <amount>", NamedTextColor.RED));
             return true;
         }
 
-        handleInitiate(player, args[0], args[1]);
-        return true;
-    }
-
-    private void handleInitiate(Player player, String idInput, String amountInput) {
-        String enterpriseId = EnterpriseManager.normalize(idInput);
+        String enterpriseId = EnterpriseManager.normalize(args[0]);
         EnterpriseAccount account = enterpriseManager.get(enterpriseId);
 
         if (account == null) {
             player.sendMessage(Component.text(
                     "No Enterprise found with ID '" + enterpriseId + "'.", NamedTextColor.RED));
-            return;
+            return true;
         }
 
         long amount;
         try {
-            amount = Long.parseLong(amountInput);
+            amount = Long.parseLong(args[1]);
         } catch (NumberFormatException e) {
             player.sendMessage(Component.text("Amount must be a whole number.", NamedTextColor.RED));
-            return;
+            return true;
         }
 
         if (amount <= 0) {
             player.sendMessage(Component.text("Amount must be greater than zero.", NamedTextColor.RED));
-            return;
+            return true;
         }
 
-        long room = EnterpriseAccount.MAX_BALANCE - account.balance;
+        long room = account.maxBalance - account.balance;
         if (amount > room) {
             player.sendMessage(Component.text(
                     account.name + " can only receive " + room + " more Crystal(s) before hitting its "
-                            + String.format("%,d", EnterpriseAccount.MAX_BALANCE) + " limit.", NamedTextColor.RED));
-            return;
+                            + String.format("%,d", account.maxBalance) + " limit.", NamedTextColor.RED));
+            return true;
         }
 
         if (!player.isOp()) {
@@ -111,67 +81,7 @@ public class PayEnterpriseCommand implements CommandExecutor {
                 player.sendMessage(Component.text(
                         "You don't have enough Crystals. Needed: " + amount + ", You have: " + have,
                         NamedTextColor.RED));
-                return;
-            }
-        }
-
-        confirmationManager.set(player.getUniqueId(), enterpriseId, amount);
-
-        Component confirmButton = Component.text("[Click to Confirm]", NamedTextColor.GREEN)
-                .clickEvent(ClickEvent.runCommand("/payenterprise confirm"));
-        Component cancelButton = Component.text("[Cancel]", NamedTextColor.RED)
-                .clickEvent(ClickEvent.runCommand("/payenterprise cancel"));
-
-        player.sendMessage(Component.text("Confirm payment of ", NamedTextColor.YELLOW)
-                .append(Component.text(amount + " Crystal(s) ", NamedTextColor.LIGHT_PURPLE))
-                .append(Component.text("to " + account.name + " (" + account.enterpriseId + ")?",
-                        NamedTextColor.YELLOW)));
-        player.sendMessage(confirmButton.append(Component.text("   ")).append(cancelButton));
-        player.sendMessage(Component.text("This confirmation expires in 30 seconds.", NamedTextColor.GRAY));
-    }
-
-    private void handleConfirm(Player player) {
-        EnterprisePaymentConfirmationManager.PendingPayment pending =
-                confirmationManager.get(player.getUniqueId());
-
-        if (pending == null) {
-            player.sendMessage(Component.text(
-                    "You have no pending Enterprise payment to confirm.", NamedTextColor.YELLOW));
-            return;
-        }
-
-        if (pending.isExpired()) {
-            confirmationManager.clear(player.getUniqueId());
-            player.sendMessage(Component.text(
-                    "That payment confirmation expired. Please try again.", NamedTextColor.RED));
-            return;
-        }
-
-        EnterpriseAccount account = enterpriseManager.get(pending.enterpriseId);
-        if (account == null) {
-            confirmationManager.clear(player.getUniqueId());
-            player.sendMessage(Component.text("That Enterprise no longer exists.", NamedTextColor.RED));
-            return;
-        }
-
-        long amount = pending.amount;
-        long room = EnterpriseAccount.MAX_BALANCE - account.balance;
-        if (amount > room) {
-            confirmationManager.clear(player.getUniqueId());
-            player.sendMessage(Component.text(
-                    "This Enterprise's balance changed and can no longer accept that amount. Payment cancelled.",
-                    NamedTextColor.RED));
-            return;
-        }
-
-        if (!player.isOp()) {
-            int have = countCrystals(player.getInventory());
-            if (have < amount) {
-                confirmationManager.clear(player.getUniqueId());
-                player.sendMessage(Component.text(
-                        "You no longer have enough Crystals for this payment. Payment cancelled.",
-                        NamedTextColor.RED));
-                return;
+                return true;
             }
             removeCrystals(player.getInventory(), (int) amount);
         }
@@ -179,7 +89,6 @@ public class PayEnterpriseCommand implements CommandExecutor {
         account.addBalance(amount);
         account.addTransaction(player.getName(), "PAYMENT", amount);
         enterpriseManager.save();
-        confirmationManager.clear(player.getUniqueId());
 
         if (player.isOp()) {
             player.sendMessage(Component.text("[OP Bypass] ", NamedTextColor.GOLD)
@@ -191,6 +100,7 @@ public class PayEnterpriseCommand implements CommandExecutor {
         }
 
         notifyMembers(account, player, amount);
+        return true;
     }
 
     private void notifyMembers(EnterpriseAccount account, Player payer, long amount) {
@@ -240,4 +150,4 @@ public class PayEnterpriseCommand implements CommandExecutor {
             }
         }
     }
-                       }
+                }
