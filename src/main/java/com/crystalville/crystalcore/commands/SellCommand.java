@@ -1,5 +1,6 @@
 package com.crystalville.crystalcore.commands;
 
+import com.crystalville.crystalcore.gui.SellGuiManager;
 import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.managers.ShopManager;
@@ -15,21 +16,15 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * /sell <item> <quantity>  - sell items from your inventory for Crystals
  * /sell info <item>        - check an item's sell price without selling
+ * /sell gui                - opens a visual, paginated sell interface
  *
- * Open to all players. Sell price is always lower than buy price
- * (see config.yml "shop" section) to maintain a healthy SMP economy.
- *
- * If the player's inventory doesn't have room for all the Crystals earned,
- * the overflow is deposited straight into their Crystal Bank (respecting
- * the normal bank cap) instead of being dropped on the ground. Only if
- * BOTH the inventory AND the bank are full does anything actually drop,
- * as a last-resort safety net so nothing is ever silently lost.
+ * Open to all players. If a sale's payout doesn't fully fit in the
+ * player's inventory, the overflow is deposited into their Crystal Bank
+ * (respecting the normal cap) instead of being dropped on the ground.
  */
 public class SellCommand implements CommandExecutor {
 
@@ -38,11 +33,14 @@ public class SellCommand implements CommandExecutor {
     private final ShopManager shopManager;
     private final BankManager bankManager;
     private final RankManager rankManager;
+    private final SellGuiManager sellGuiManager;
 
-    public SellCommand(ShopManager shopManager, BankManager bankManager, RankManager rankManager) {
+    public SellCommand(ShopManager shopManager, BankManager bankManager, RankManager rankManager,
+                        SellGuiManager sellGuiManager) {
         this.shopManager = shopManager;
         this.bankManager = bankManager;
         this.rankManager = rankManager;
+        this.sellGuiManager = sellGuiManager;
     }
 
     @Override
@@ -63,6 +61,11 @@ public class SellCommand implements CommandExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("gui")) {
+            player.openInventory(sellGuiManager.open(player, 0));
+            return true;
+        }
+
         handleSale(player, args);
         return true;
     }
@@ -71,6 +74,7 @@ public class SellCommand implements CommandExecutor {
         player.sendMessage(Component.text("Usage:", NamedTextColor.RED));
         player.sendMessage(Component.text("  /sell <item name> <quantity>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("  /sell info <item name>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("  /sell gui", NamedTextColor.GRAY));
     }
 
     private void handleInfo(Player player, String[] args) {
@@ -156,19 +160,13 @@ public class SellCommand implements CommandExecutor {
                 + " for " + totalPayout + " Crystal(s).", NamedTextColor.GREEN));
     }
 
-    /**
-     * Pays out `totalAmount` Crystals to the player: as much as fits directly
-     * into their inventory, any remainder into their Crystal Bank, and only
-     * whatever still doesn't fit (bank also full/capped) gets dropped on the
-     * ground as an absolute last resort.
-     */
     private void payoutCrystals(Player player, int totalAmount) {
         int inventoryCapacity = CrystalItemUtil.freeCapacity(player);
         int toInventory = Math.min(totalAmount, inventoryCapacity);
         int remainder = totalAmount - toInventory;
 
         if (toInventory > 0) {
-            giveCrystalsToInventory(player, toInventory);
+            CrystalItemUtil.giveCrystals(player, toInventory);
         }
 
         if (remainder <= 0) {
@@ -177,7 +175,7 @@ public class SellCommand implements CommandExecutor {
 
         boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
-        int stillOverflow = remainder - (int) depositedToBank;
+        long stillOverflow = remainder - depositedToBank;
 
         if (depositedToBank > 0) {
             player.sendMessage(Component.text(
@@ -186,8 +184,7 @@ public class SellCommand implements CommandExecutor {
         }
 
         if (stillOverflow > 0) {
-            // Both inventory and bank are full/capped - drop the remainder so nothing is lost.
-            dropCrystals(player, stillOverflow);
+            CrystalItemUtil.giveCrystals(player, stillOverflow);
             player.sendMessage(Component.text(
                     "Your bank is also full - " + stillOverflow + " Crystal(s) were dropped at your feet.",
                     NamedTextColor.YELLOW));
@@ -235,35 +232,4 @@ public class SellCommand implements CommandExecutor {
             }
         }
     }
-
-    /** Gives Crystals directly into the inventory. Caller guarantees this amount fits. */
-    private void giveCrystalsToInventory(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            // No overflow handling needed here - freeCapacity() already guaranteed this fits.
-            player.getInventory().addItem(stack);
-            remaining -= stackSize;
-        }
-    }
-
-    private void dropCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        Map<Integer, ItemStack> overflow = new HashMap<>();
-
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            overflow.put(overflow.size(), stack);
-            remaining -= stackSize;
-        }
-
-        for (ItemStack stack : overflow.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), stack);
-        }
-    }
-                        } 
+                }
