@@ -2,16 +2,20 @@ package com.crystalville.crystalcore.commands;
 
 import com.crystalville.crystalcore.CrystalCore;
 import com.crystalville.crystalcore.managers.RankManager;
+import com.crystalville.crystalcore.util.PlayerResolver;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+/**
+ * /rank <player> <rankname> <colour>  - set a custom rank
+ * /rank remove <player>               - remove a player's rank entirely
+ * OP only.
+ */
 public class RankCommand implements CommandExecutor {
 
     private final CrystalCore plugin;
@@ -29,10 +33,15 @@ public class RankCommand implements CommandExecutor {
             return true;
         }
 
+        if (args.length >= 1 && args[0].equalsIgnoreCase("remove")) {
+            handleRemove(sender, args);
+            return true;
+        }
+
         if (args.length != 3) {
             sender.sendMessage(Component.text("Usage: /rank <player> <rankname> <colour>", NamedTextColor.RED));
-            sender.sendMessage(Component.text(
-                    "Colour can be a name (GOLD, AQUA, RED...) or a hex code (#FF00AA).", NamedTextColor.GRAY));
+            sender.sendMessage(Component.text("       /rank remove <player>", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Colour can be a name (GOLD, AQUA, RED...) or a hex code (#FF00AA).", NamedTextColor.GRAY));
             return true;
         }
 
@@ -40,10 +49,10 @@ public class RankCommand implements CommandExecutor {
         String rankName = args[1];
         String colorInput = args[2];
 
-        TextColor resolved = RankManager.parseColor(colorInput);
+        var resolved = RankManager.parseColor(colorInput);
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(playerName);
-        if (target == null || (target.getName() == null && !target.hasPlayedBefore())) {
+        OfflinePlayer target = PlayerResolver.resolve(playerName);
+        if (target == null) {
             sender.sendMessage(Component.text(
                     "Player '" + playerName + "' has never joined this server.", NamedTextColor.RED));
             return true;
@@ -60,7 +69,6 @@ public class RankCommand implements CommandExecutor {
             Component prefix = rankManager.getFormattedPrefixComponent(online.getUniqueId());
             Component displayName = prefix.append(Component.text(online.getName()));
             online.playerListName(displayName);
-
             online.sendMessage(Component.text("Your rank has been updated to ", NamedTextColor.GREEN)
                     .append(Component.text(rankName, resolved))
                     .append(Component.text(" by " + sender.getName() + ".", NamedTextColor.GREEN)));
@@ -68,4 +76,35 @@ public class RankCommand implements CommandExecutor {
 
         return true;
     }
-                             }
+
+    private void handleRemove(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /rank remove <player>", NamedTextColor.RED));
+            return;
+        }
+
+        OfflinePlayer target = PlayerResolver.resolve(args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("Player '" + args[1] + "' was not found.", NamedTextColor.RED));
+            return;
+        }
+
+        boolean removed = rankManager.clearRank(target.getUniqueId());
+
+        if (!removed) {
+            sender.sendMessage(Component.text(
+                    args[1] + " doesn't have a rank set.", NamedTextColor.YELLOW));
+            return;
+        }
+
+        sender.sendMessage(Component.text(
+                "Removed " + args[1] + "'s rank.", NamedTextColor.GREEN));
+
+        Player online = target.getPlayer();
+        if (online != null) {
+            online.playerListName(Component.text(online.getName()));
+            online.sendMessage(Component.text(
+                    "Your rank was removed by " + sender.getName() + ".", NamedTextColor.YELLOW));
+        }
+    }
+                                          }
