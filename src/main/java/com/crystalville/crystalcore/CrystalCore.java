@@ -8,8 +8,10 @@ import com.crystalville.crystalcore.commands.EditHudCommand;
 import com.crystalville.crystalcore.commands.EnterpriseCommand;
 import com.crystalville.crystalcore.commands.HoleFillerCommand;
 import com.crystalville.crystalcore.commands.HudCommand;
+import com.crystalville.crystalcore.commands.IncreaseLimitCommand;
 import com.crystalville.crystalcore.commands.InspectCommand;
 import com.crystalville.crystalcore.commands.InventoryCommand;
+import com.crystalville.crystalcore.commands.IssueGuideCommand;
 import com.crystalville.crystalcore.commands.LogoCommand;
 import com.crystalville.crystalcore.commands.PayCommand;
 import com.crystalville.crystalcore.commands.PayEnterpriseCommand;
@@ -19,16 +21,19 @@ import com.crystalville.crystalcore.commands.WebLinkCommand;
 import com.crystalville.crystalcore.commands.SellCommand;
 import com.crystalville.crystalcore.commands.ShopCommand;
 import com.crystalville.crystalcore.gui.BankGuiManager;
+import com.crystalville.crystalcore.gui.EnterpriseGuiManager;
+import com.crystalville.crystalcore.gui.SellGuiManager;
 import com.crystalville.crystalcore.listeners.AntiTheftListener;
 import com.crystalville.crystalcore.listeners.BankGuiListener;
 import com.crystalville.crystalcore.listeners.CrystalListener;
+import com.crystalville.crystalcore.listeners.EnterpriseGuiListener;
 import com.crystalville.crystalcore.listeners.HoleFillerListener;
 import com.crystalville.crystalcore.listeners.HudListener;
+import com.crystalville.crystalcore.listeners.SellGuiListener;
 import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.ChestLogManager;
 import com.crystalville.crystalcore.managers.CrystalRenameTask;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
-import com.crystalville.crystalcore.managers.EnterprisePaymentConfirmationManager;
 import com.crystalville.crystalcore.managers.HoleFillerManager;
 import com.crystalville.crystalcore.managers.HudManager;
 import com.crystalville.crystalcore.managers.InspectorManager;
@@ -57,7 +62,8 @@ public final class CrystalCore extends JavaPlugin {
     private BankManager bankManager;
     private BankGuiManager bankGuiManager;
     private EnterpriseManager enterpriseManager;
-    private EnterprisePaymentConfirmationManager enterprisePaymentConfirmationManager;
+    private EnterpriseGuiManager enterpriseGuiManager;
+    private SellGuiManager sellGuiManager;
     private HudListener hudListener;
     private Material payCurrency;
     private Material buyCurrency;
@@ -109,7 +115,9 @@ public final class CrystalCore extends JavaPlugin {
         this.enterpriseManager = new EnterpriseManager(this);
         this.enterpriseManager.load();
 
-        this.enterprisePaymentConfirmationManager = new EnterprisePaymentConfirmationManager();
+        this.enterpriseGuiManager = new EnterpriseGuiManager();
+
+        this.sellGuiManager = new SellGuiManager(shopManager);
 
         this.hudListener = new HudListener(
                 this,
@@ -122,7 +130,7 @@ public final class CrystalCore extends JavaPlugin {
 
         getCommand("pay").setExecutor(new PayCommand(this));
         getCommand("buy").setExecutor(new BuyCommand(shopManager, rankManager));
-        getCommand("sell").setExecutor(new SellCommand(shopManager, bankManager, rankManager));
+        getCommand("sell").setExecutor(new SellCommand(shopManager, bankManager, rankManager, sellGuiManager));
         getCommand("rank").setExecutor(new RankCommand(this, rankManager));
         getCommand("role").setExecutor(new RoleCommand(rankManager));
         getCommand("logo").setExecutor(new LogoCommand());
@@ -136,9 +144,11 @@ public final class CrystalCore extends JavaPlugin {
         getCommand("edit").setExecutor(new EditHudCommand(hudManager, hudListener));
         getCommand("cvlink").setExecutor(new WebLinkCommand(this));
         getCommand("bank").setExecutor(new BankCommand(bankManager, bankGuiManager));
-        getCommand("enterprise").setExecutor(new EnterpriseCommand(enterpriseManager, bankManager, rankManager));
-        getCommand("payenterprise").setExecutor(
-                new PayEnterpriseCommand(enterpriseManager, enterprisePaymentConfirmationManager));
+        getCommand("enterprise").setExecutor(
+                new EnterpriseCommand(enterpriseManager, bankManager, rankManager, enterpriseGuiManager));
+        getCommand("payenterprise").setExecutor(new PayEnterpriseCommand(enterpriseManager));
+        getCommand("increase").setExecutor(new IncreaseLimitCommand(bankManager, rankManager));
+        getCommand("issue").setExecutor(new IssueGuideCommand(enterpriseManager));
 
         getServer().getPluginManager().registerEvents(
                 new CrystalListener(rankManager, mailboxManager),
@@ -157,6 +167,10 @@ public final class CrystalCore extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(hudListener, this);
         getServer().getPluginManager().registerEvents(new BankGuiListener(bankGuiManager, bankManager), this);
+        getServer().getPluginManager().registerEvents(
+                new EnterpriseGuiListener(enterpriseGuiManager, enterpriseManager, bankManager, rankManager), this);
+        getServer().getPluginManager().registerEvents(
+                new SellGuiListener(sellGuiManager, shopManager, bankManager, rankManager), this);
 
         if (getConfig().getBoolean("rename-amethyst-to-crystal", true)) {
             long interval = getConfig().getLong(
@@ -276,4 +290,4 @@ public final class CrystalCore extends JavaPlugin {
     public Material getBuyCurrency() {
         return buyCurrency;
     }
-}
+    }
