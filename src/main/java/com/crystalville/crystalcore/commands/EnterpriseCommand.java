@@ -1,5 +1,6 @@
 package com.crystalville.crystalcore.commands;
 
+import com.crystalville.crystalcore.gui.EnterpriseGuiManager;
 import com.crystalville.crystalcore.managers.BankManager;
 import com.crystalville.crystalcore.managers.EnterpriseAccount;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
@@ -7,6 +8,8 @@ import com.crystalville.crystalcore.managers.EnterprisePermission;
 import com.crystalville.crystalcore.managers.EnterpriseTransaction;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
+import com.crystalville.crystalcore.util.EnterpriseBookUtil;
+import com.crystalville.crystalcore.util.PlayerResolver;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -27,24 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * /enterprise create <ID> <Company Name...>
- * /enterprise info <ID>
- * /enterprise balance <ID>
- * /enterprise deposit <ID> <amount>
- * /enterprise withdraw <ID> <amount>
- * /enterprise add <ID> <player> <perms|ALL>
- * /enterprise remove <ID> <player>
- * /enterprise setperms <ID> <player> <perms|ALL>
- * /enterprise members <ID>
- * /enterprise history <ID>
- * /enterprise list
- *
- * Any player can create and own an Enterprise Bank. The owner always has
- * every permission implicitly; other members act strictly within whatever
- * permissions they've been granted. Enterprise balances are completely
- * separate from personal /bank balances.
- */
 public class EnterpriseCommand implements CommandExecutor {
 
     private static final String FINANCE_MINISTER_ROLE = "FINANCE_MINISTER";
@@ -53,11 +38,14 @@ public class EnterpriseCommand implements CommandExecutor {
     private final EnterpriseManager enterpriseManager;
     private final BankManager bankManager;
     private final RankManager rankManager;
+    private final EnterpriseGuiManager enterpriseGuiManager;
 
-    public EnterpriseCommand(EnterpriseManager enterpriseManager, BankManager bankManager, RankManager rankManager) {
+    public EnterpriseCommand(EnterpriseManager enterpriseManager, BankManager bankManager,
+                              RankManager rankManager, EnterpriseGuiManager enterpriseGuiManager) {
         this.enterpriseManager = enterpriseManager;
         this.bankManager = bankManager;
         this.rankManager = rankManager;
+        this.enterpriseGuiManager = enterpriseGuiManager;
     }
 
     @Override
@@ -107,6 +95,12 @@ public class EnterpriseCommand implements CommandExecutor {
             case "list":
                 handleList(player);
                 break;
+            case "increase":
+                handleIncrease(player, args);
+                break;
+            case "gui":
+                handleGui(player, args);
+                break;
             default:
                 sendUsage(player);
         }
@@ -121,17 +115,17 @@ public class EnterpriseCommand implements CommandExecutor {
         player.sendMessage(Component.text("/enterprise balance <ID>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise deposit <ID> <amount>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise withdraw <ID> <amount>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/enterprise gui <ID>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise add <ID> <player> <perms|ALL>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise remove <ID> <player>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise setperms <ID> <player> <perms|ALL>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise members <ID>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise history <ID>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/enterprise list", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/enterprise increase <ID> <new limit>  (OP/Finance Minister)", NamedTextColor.GRAY));
         player.sendMessage(Component.text(
                 "Permissions: VIEW_BALANCE, DEPOSIT, WITHDRAW, VIEW_HISTORY, MANAGE_MEMBERS", NamedTextColor.DARK_GRAY));
     }
-
-    // ---------------------------------------------------------------- create
 
     private void handleCreate(Player player, String[] args) {
         if (args.length < 3) {
@@ -163,15 +157,19 @@ public class EnterpriseCommand implements CommandExecutor {
         player.sendMessage(Component.text(
                 "Players can now pay your company with: /payenterprise " + account.enterpriseId + " <amount>",
                 NamedTextColor.GRAY));
-    }
 
-    // ------------------------------------------------------------------ info
+        ItemStack handbook = EnterpriseBookUtil.createHandbook(account);
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(handbook);
+        for (ItemStack leftover : overflow.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+        player.sendMessage(Component.text(
+                "You received the Enterprise Handbook - read it for a full guide!", NamedTextColor.AQUA));
+    }
 
     private void handleInfo(Player player, String[] args) {
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         player.sendMessage(Component.text("=== " + account.name + " ===", NamedTextColor.AQUA));
         player.sendMessage(Component.text("ID: ", NamedTextColor.GRAY)
@@ -187,18 +185,14 @@ public class EnterpriseCommand implements CommandExecutor {
         if (account.hasPermission(player.getUniqueId(), EnterprisePermission.VIEW_BALANCE)) {
             player.sendMessage(Component.text("Balance: ", NamedTextColor.GRAY)
                     .append(Component.text(String.format("%,d", account.balance) + " / "
-                            + String.format("%,d", EnterpriseAccount.MAX_BALANCE) + " Crystals",
+                            + String.format("%,d", account.maxBalance) + " Crystals",
                             NamedTextColor.LIGHT_PURPLE)));
         }
     }
 
-    // --------------------------------------------------------------- balance
-
     private void handleBalance(Player player, String[] args) {
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.VIEW_BALANCE)) {
             player.sendMessage(Component.text(
@@ -208,11 +202,9 @@ public class EnterpriseCommand implements CommandExecutor {
 
         player.sendMessage(Component.text(account.name + " balance: ", NamedTextColor.GREEN)
                 .append(Component.text(String.format("%,d", account.balance) + " / "
-                        + String.format("%,d", EnterpriseAccount.MAX_BALANCE) + " Crystals",
+                        + String.format("%,d", account.maxBalance) + " Crystals",
                         NamedTextColor.LIGHT_PURPLE)));
     }
-
-    // --------------------------------------------------------------- deposit
 
     private void handleDeposit(Player player, String[] args) {
         if (args.length < 3) {
@@ -221,9 +213,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.DEPOSIT)) {
             player.sendMessage(Component.text(
@@ -232,9 +222,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         int amount = parsePositiveInt(player, args[2]);
-        if (amount <= 0) {
-            return;
-        }
+        if (amount <= 0) return;
 
         if (!player.isOp()) {
             int have = countCrystals(player.getInventory());
@@ -249,7 +237,7 @@ public class EnterpriseCommand implements CommandExecutor {
         long added = account.addBalance(amount);
         if (added <= 0) {
             player.sendMessage(Component.text(
-                    account.name + " is already at its " + String.format("%,d", EnterpriseAccount.MAX_BALANCE)
+                    account.name + " is already at its " + String.format("%,d", account.maxBalance)
                             + " Crystal limit.", NamedTextColor.RED));
             return;
         }
@@ -271,8 +259,6 @@ public class EnterpriseCommand implements CommandExecutor {
         }
     }
 
-    // -------------------------------------------------------------- withdraw
-
     private void handleWithdraw(Player player, String[] args) {
         if (args.length < 3) {
             player.sendMessage(Component.text("Usage: /enterprise withdraw <ID> <amount>", NamedTextColor.RED));
@@ -280,9 +266,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.WITHDRAW)) {
             player.sendMessage(Component.text(
@@ -291,9 +275,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         int amount = parsePositiveInt(player, args[2]);
-        if (amount <= 0) {
-            return;
-        }
+        if (amount <= 0) return;
 
         if (account.balance <= 0) {
             player.sendMessage(Component.text(account.name + " has no funds to withdraw.", NamedTextColor.YELLOW));
@@ -320,7 +302,52 @@ public class EnterpriseCommand implements CommandExecutor {
         }
     }
 
-    // ---------------------------------------------------------- add / remove
+    private void handleGui(Player player, String[] args) {
+        EnterpriseAccount account = requireAccount(player, args, 1);
+        if (account == null) return;
+
+        if (!account.isMember(player.getUniqueId())) {
+            player.sendMessage(Component.text("You are not a member of this Enterprise.", NamedTextColor.RED));
+            return;
+        }
+
+        player.openInventory(enterpriseGuiManager.open(player, account));
+    }
+
+    private void handleIncrease(Player player, String[] args) {
+        boolean authorized = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        if (!authorized) {
+            player.sendMessage(Component.text(
+                    "Only OPs and the Finance Minister can increase an Enterprise's limit.", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 3) {
+            player.sendMessage(Component.text("Usage: /enterprise increase <ID> <new limit>", NamedTextColor.RED));
+            return;
+        }
+
+        EnterpriseAccount account = requireAccount(player, args, 1);
+        if (account == null) return;
+
+        long newLimit;
+        try {
+            newLimit = Long.parseLong(args[2]);
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text("New limit must be a whole number.", NamedTextColor.RED));
+            return;
+        }
+
+        if (newLimit <= 0) {
+            player.sendMessage(Component.text("New limit must be greater than zero.", NamedTextColor.RED));
+            return;
+        }
+
+        enterpriseManager.setMaxBalance(account, newLimit);
+
+        player.sendMessage(Component.text("Set " + account.name + "'s balance limit to "
+                + String.format("%,d", newLimit) + " Crystal(s).", NamedTextColor.GREEN));
+    }
 
     private void handleAddMember(Player player, String[] args) {
         if (args.length < 4) {
@@ -330,9 +357,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.MANAGE_MEMBERS)) {
             player.sendMessage(Component.text(
@@ -340,10 +365,11 @@ public class EnterpriseCommand implements CommandExecutor {
             return;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
-        if (target.getName() == null && !target.hasPlayedBefore()) {
+        OfflinePlayer target = PlayerResolver.resolve(args[2]);
+        if (target == null) {
             player.sendMessage(Component.text(
-                    "Player '" + args[2] + "' has never joined this server.", NamedTextColor.RED));
+                    "Player '" + args[2] + "' was not found (must have joined this server before).",
+                    NamedTextColor.RED));
             return;
         }
 
@@ -375,9 +401,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.MANAGE_MEMBERS)) {
             player.sendMessage(Component.text(
@@ -385,7 +409,11 @@ public class EnterpriseCommand implements CommandExecutor {
             return;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+        OfflinePlayer target = PlayerResolver.resolve(args[2]);
+        if (target == null) {
+            player.sendMessage(Component.text("Player '" + args[2] + "' was not found.", NamedTextColor.RED));
+            return;
+        }
 
         if (target.getUniqueId().equals(account.ownerUuid)) {
             player.sendMessage(Component.text("You cannot remove the Enterprise owner.", NamedTextColor.RED));
@@ -411,9 +439,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.MANAGE_MEMBERS)) {
             player.sendMessage(Component.text(
@@ -421,7 +447,12 @@ public class EnterpriseCommand implements CommandExecutor {
             return;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+        OfflinePlayer target = PlayerResolver.resolve(args[2]);
+        if (target == null) {
+            player.sendMessage(Component.text("Player '" + args[2] + "' was not found.", NamedTextColor.RED));
+            return;
+        }
+
         if (!account.members.containsKey(target.getUniqueId())) {
             player.sendMessage(Component.text(
                     target.getName() + " is not a member of " + account.name + ".", NamedTextColor.RED));
@@ -441,13 +472,9 @@ public class EnterpriseCommand implements CommandExecutor {
                 "Updated " + target.getName() + "'s permissions to: " + permsToString(perms), NamedTextColor.GREEN));
     }
 
-    // ------------------------------------------------------------- members
-
     private void handleListMembers(Player player, String[] args) {
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         player.sendMessage(Component.text("=== " + account.name + " Members ===", NamedTextColor.AQUA));
 
@@ -469,13 +496,9 @@ public class EnterpriseCommand implements CommandExecutor {
         }
     }
 
-    // ------------------------------------------------------------- history
-
     private void handleHistory(Player player, String[] args) {
         EnterpriseAccount account = requireAccount(player, args, 1);
-        if (account == null) {
-            return;
-        }
+        if (account == null) return;
 
         if (!account.hasPermission(player.getUniqueId(), EnterprisePermission.VIEW_HISTORY)) {
             player.sendMessage(Component.text(
@@ -506,18 +529,12 @@ public class EnterpriseCommand implements CommandExecutor {
 
     private String prettyType(String type) {
         switch (type) {
-            case "PAYMENT":
-                return "Payment";
-            case "DEPOSIT":
-                return "Deposit";
-            case "WITHDRAWAL":
-                return "Withdrawal";
-            default:
-                return type;
+            case "PAYMENT": return "Payment";
+            case "DEPOSIT": return "Deposit";
+            case "WITHDRAWAL": return "Withdrawal";
+            default: return type;
         }
     }
-
-    // ---------------------------------------------------------------- list
 
     private void handleList(Player player) {
         List<EnterpriseAccount> accounts = enterpriseManager.getForPlayer(player.getUniqueId());
@@ -534,8 +551,6 @@ public class EnterpriseCommand implements CommandExecutor {
                     account.name + " (" + account.enterpriseId + ") - " + role, NamedTextColor.WHITE));
         }
     }
-
-    // -------------------------------------------------------------- helpers
 
     private EnterpriseAccount requireAccount(Player player, String[] args, int idIndex) {
         if (args.length <= idIndex) {
@@ -565,9 +580,7 @@ public class EnterpriseCommand implements CommandExecutor {
 
         for (String part : input.split(",")) {
             EnterprisePermission perm = EnterprisePermission.fromString(part);
-            if (perm != null) {
-                result.add(perm);
-            }
+            if (perm != null) result.add(perm);
         }
         return result;
     }
@@ -578,9 +591,7 @@ public class EnterpriseCommand implements CommandExecutor {
         }
         StringBuilder sb = new StringBuilder();
         for (EnterprisePermission perm : perms) {
-            if (sb.length() > 0) {
-                sb.append(", ");
-            }
+            if (sb.length() > 0) sb.append(", ");
             sb.append(perm.name());
         }
         return sb.toString();
@@ -629,28 +640,20 @@ public class EnterpriseCommand implements CommandExecutor {
         }
     }
 
-    /**
-     * Pays out Crystals to a member withdrawing from an Enterprise: as much
-     * as fits in their inventory, overflow into their personal Crystal Bank
-     * (respecting its cap), and only drops on the ground as a last resort -
-     * consistent with how /sell overflow is handled.
-     */
     private void payoutCrystals(Player player, int totalAmount) {
         int inventoryCapacity = CrystalItemUtil.freeCapacity(player);
         int toInventory = Math.min(totalAmount, inventoryCapacity);
         int remainder = totalAmount - toInventory;
 
         if (toInventory > 0) {
-            giveCrystalsToInventory(player, toInventory);
+            CrystalItemUtil.giveCrystals(player, toInventory);
         }
 
-        if (remainder <= 0) {
-            return;
-        }
+        if (remainder <= 0) return;
 
         boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
-        int stillOverflow = remainder - (int) depositedToBank;
+        long stillOverflow = remainder - depositedToBank;
 
         if (depositedToBank > 0) {
             player.sendMessage(Component.text(
@@ -659,32 +662,10 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         if (stillOverflow > 0) {
-            dropCrystals(player, stillOverflow);
+            CrystalItemUtil.giveCrystals(player, stillOverflow);
             player.sendMessage(Component.text(
                     "Your personal bank is also full - " + stillOverflow + " Crystal(s) were dropped at your feet.",
                     NamedTextColor.YELLOW));
         }
     }
-
-    private void giveCrystalsToInventory(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            player.getInventory().addItem(stack);
-            remaining -= stackSize;
-        }
     }
-
-    private void dropCrystals(Player player, int amount) {
-        int maxStack = CrystalItemUtil.CURRENCY_MATERIAL.getMaxStackSize();
-        int remaining = amount;
-        while (remaining > 0) {
-            int stackSize = Math.min(remaining, maxStack);
-            ItemStack stack = CrystalItemUtil.createCrystal(stackSize);
-            player.getWorld().dropItemNaturally(player.getLocation(), stack);
-            remaining -= stackSize;
-        }
-    }
-}
