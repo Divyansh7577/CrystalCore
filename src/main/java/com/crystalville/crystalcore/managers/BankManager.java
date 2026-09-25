@@ -11,10 +11,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Stores each player's Crystal Bank balance - a safe stash of Crystals kept
- * separate from their physical inventory. Normal players are capped at
- * NORMAL_PLAYER_CAP; OPs and Finance Minister role holders have no cap
- * (checked by the caller, not this class).
+ * Stores each player's Crystal Bank balance and personal cap. The default
+ * cap is NORMAL_PLAYER_CAP (10,000), but any player's cap can be individually
+ * raised via /increase limit. OPs and Finance Minister role holders bypass caps
+ * entirely (checked by the caller, not this class).
  */
 public class BankManager {
 
@@ -25,6 +25,7 @@ public class BankManager {
     private FileConfiguration bankConfig;
 
     private final Map<UUID, Long> balances = new HashMap<>();
+    private final Map<UUID, Long> customCaps = new HashMap<>();
 
     public BankManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -43,17 +44,28 @@ public class BankManager {
 
         bankConfig = YamlConfiguration.loadConfiguration(bankFile);
         balances.clear();
+        customCaps.clear();
 
-        if (bankConfig.getConfigurationSection("balances") == null) {
-            return;
+        if (bankConfig.getConfigurationSection("balances") != null) {
+            for (String uuidStr : bankConfig.getConfigurationSection("balances").getKeys(false)) {
+                try {
+                    UUID uuid = UUID.fromString(uuidStr);
+                    balances.put(uuid, bankConfig.getLong("balances." + uuidStr, 0L));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
         }
 
-        for (String uuidStr : bankConfig.getConfigurationSection("balances").getKeys(false)) {
-            try {
-                UUID uuid = UUID.fromString(uuidStr);
-                balances.put(uuid, bankConfig.getLong("balances." + uuidStr, 0L));
-            } catch (IllegalArgumentException ignored) {
-                // skip malformed UUID entries
+        if (bankConfig.getConfigurationSection("caps") != null) {
+            for (String uuidStr : bankConfig.getConfigurationSection("caps").getKeys(false)) {
+                try {
+                    UUID uuid = UUID.fromString(uuidStr);
+                    long cap = bankConfig.getLong("caps." + uuidStr, NORMAL_PLAYER_CAP);
+                    if (cap > 0) {
+                        customCaps.put(uuid, cap);
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
     }
@@ -64,6 +76,9 @@ public class BankManager {
         }
         for (Map.Entry<UUID, Long> entry : balances.entrySet()) {
             bankConfig.set("balances." + entry.getKey(), entry.getValue());
+        }
+        for (Map.Entry<UUID, Long> entry : customCaps.entrySet()) {
+            bankConfig.set("caps." + entry.getKey(), entry.getValue());
         }
         try {
             bankConfig.save(bankFile);
@@ -76,11 +91,17 @@ public class BankManager {
         return balances.getOrDefault(uuid, 0L);
     }
 
-    /**
-     * Attempts to add `amount` to the player's balance. If not unlimited,
-     * deposits are silently capped at NORMAL_PLAYER_CAP.
-     * Returns the amount actually deposited (may be less than requested).
-     */
+    /** This player's personal bank cap - default 10,000, or a custom raised limit if set. */
+    public long getCap(UUID uuid) {
+        return customCaps.getOrDefault(uuid, NORMAL_PLAYER_CAP);
+    }
+
+    /** Sets a custom personal bank cap for a player (via /increase limit). Persists immediately. */
+    public void setCap(UUID uuid, long newCap) {
+        customCaps.put(uuid, newCap);
+        save();
+    }
+
     public long deposit(UUID uuid, long amount, boolean unlimited) {
         long current = getBalance(uuid);
         long actuallyDeposited;
@@ -88,7 +109,8 @@ public class BankManager {
         if (unlimited) {
             actuallyDeposited = amount;
         } else {
-            long room = Math.max(0, NORMAL_PLAYER_CAP - current);
+            long cap = getCap(uuid);
+            long room = Math.max(0, cap - current);
             actuallyDeposited = Math.min(amount, room);
         }
 
@@ -97,10 +119,6 @@ public class BankManager {
         return actuallyDeposited;
     }
 
-    /**
-     * Attempts to withdraw `amount` from the player's balance.
-     * Returns the amount actually withdrawn (may be less if balance is insufficient).
-     */
     public long withdraw(UUID uuid, long amount) {
         long current = getBalance(uuid);
         long actualWithdraw = Math.min(amount, current);
