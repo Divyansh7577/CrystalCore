@@ -16,11 +16,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Loads, saves, and looks up Enterprise Bank accounts - the "company"
- * banking layer sitting entirely separate from personal /bank balances
- * (BankManager). Persisted to enterprises.yml, keyed by Enterprise ID.
- */
 public class EnterpriseManager {
 
     private final JavaPlugin plugin;
@@ -54,9 +49,7 @@ public class EnterpriseManager {
 
         for (String id : section.getKeys(false)) {
             ConfigurationSection entry = section.getConfigurationSection(id);
-            if (entry == null) {
-                continue;
-            }
+            if (entry == null) continue;
 
             String name = entry.getString("name", id);
             String ownerStr = entry.getString("owner", "");
@@ -69,6 +62,7 @@ public class EnterpriseManager {
 
             EnterpriseAccount account = new EnterpriseAccount(id, name, owner);
             account.balance = entry.getLong("balance", 0L);
+            account.maxBalance = entry.getLong("maxBalance", EnterpriseAccount.DEFAULT_MAX_BALANCE);
 
             ConfigurationSection membersSection = entry.getConfigurationSection("members");
             if (membersSection != null) {
@@ -79,13 +73,10 @@ public class EnterpriseManager {
                         Set<EnterprisePermission> perms = new HashSet<>();
                         for (String part : permsRaw.split(",")) {
                             EnterprisePermission perm = EnterprisePermission.fromString(part);
-                            if (perm != null) {
-                                perms.add(perm);
-                            }
+                            if (perm != null) perms.add(perm);
                         }
                         account.members.put(memberUuid, perms);
                     } catch (IllegalArgumentException ignored) {
-                        // skip malformed UUID entries
                     }
                 }
             }
@@ -93,9 +84,7 @@ public class EnterpriseManager {
             List<String> historyRaw = entry.getStringList("history");
             for (String raw : historyRaw) {
                 EnterpriseTransaction tx = EnterpriseTransaction.deserialize(raw);
-                if (tx != null) {
-                    account.history.add(tx);
-                }
+                if (tx != null) account.history.add(tx);
             }
 
             enterprises.put(id, account);
@@ -113,13 +102,12 @@ public class EnterpriseManager {
             config.set(base + ".name", account.name);
             config.set(base + ".owner", account.ownerUuid.toString());
             config.set(base + ".balance", account.balance);
+            config.set(base + ".maxBalance", account.maxBalance);
 
             for (Map.Entry<UUID, Set<EnterprisePermission>> entry : account.members.entrySet()) {
                 StringBuilder sb = new StringBuilder();
                 for (EnterprisePermission perm : entry.getValue()) {
-                    if (sb.length() > 0) {
-                        sb.append(",");
-                    }
+                    if (sb.length() > 0) sb.append(",");
                     sb.append(perm.name());
                 }
                 config.set(base + ".members." + entry.getKey(), sb.toString());
@@ -151,7 +139,6 @@ public class EnterpriseManager {
         return input == null ? "" : input.trim().toUpperCase();
     }
 
-    /** 3-20 characters, uppercase letters/numbers/underscores only. */
     public static boolean isValidId(String id) {
         return id != null && id.matches("[A-Z0-9_]{3,20}");
     }
@@ -164,18 +151,21 @@ public class EnterpriseManager {
         return account;
     }
 
+    /** Raises (or lowers) an Enterprise's maximum balance cap. Persists immediately. */
+    public void setMaxBalance(EnterpriseAccount account, long newMax) {
+        account.maxBalance = newMax;
+        save();
+    }
+
     public Collection<EnterpriseAccount> getAll() {
         return enterprises.values();
     }
 
-    /** All Enterprises where the given player is the owner or a member. */
     public List<EnterpriseAccount> getForPlayer(UUID uuid) {
         List<EnterpriseAccount> result = new ArrayList<>();
         for (EnterpriseAccount account : enterprises.values()) {
-            if (account.isMember(uuid)) {
-                result.add(account);
-            }
+            if (account.isMember(uuid)) result.add(account);
         }
         return result;
     }
-              }
+}
