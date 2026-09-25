@@ -14,11 +14,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
 
-/**
- * Builds and refreshes the Crystal Bank GUI: a 54-slot interface with a
- * live balance display, seven "deposit slots" players place real Crystal
- * item stacks into, a Confirm Deposit button, and quick Withdraw buttons.
- */
 public final class BankGuiManager {
 
     public static final int SIZE = 54;
@@ -79,14 +74,14 @@ public final class BankGuiManager {
         return inv;
     }
 
-    /** Rebuilds just the balance-display item, without touching the deposit slots. */
     public void refreshBalance(Inventory inv, Player player) {
         long balance = bankManager.getBalance(player.getUniqueId());
         boolean unlimited = isUnlimited(player);
+        long cap = bankManager.getCap(player.getUniqueId());
 
         String limitLine = unlimited
                 ? "Limit: Unlimited (Finance Minister/OP)"
-                : "Limit: " + String.format("%,d", BankManager.NORMAL_PLAYER_CAP) + " Crystals";
+                : "Limit: " + String.format("%,d", cap) + " Crystals";
 
         inv.setItem(BALANCE_SLOT, namedItem(Material.NETHER_STAR, "Your Bank Balance", NamedTextColor.AQUA,
                 List.of(String.format("%,d", balance) + " Crystals", limitLine)));
@@ -116,4 +111,4 @@ public final class BankGuiManager {
         }
         return stack;
     }
-}
+    }
