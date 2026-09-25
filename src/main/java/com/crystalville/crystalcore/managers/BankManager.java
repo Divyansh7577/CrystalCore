@@ -12,9 +12,9 @@ import java.util.UUID;
 
 /**
  * Stores each player's Crystal Bank balance and personal cap. The default
- * cap is NORMAL_PLAYER_CAP (10,000), but any player's cap can be individually
- * raised via /increase limit. OPs and Finance Minister role holders bypass caps
- * entirely (checked by the caller, not this class).
+ * cap is NORMAL_PLAYER_CAP (10,000), but any player's cap can be
+ * individually raised via /increase limit. OPs and Finance Minister role
+ * holders bypass caps entirely (checked by the caller, not this class).
  */
 public class BankManager {
 
@@ -126,4 +126,4 @@ public class BankManager {
         save();
         return actualWithdraw;
     }
-}
+            }
