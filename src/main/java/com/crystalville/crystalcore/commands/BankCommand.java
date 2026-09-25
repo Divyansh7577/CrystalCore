@@ -18,8 +18,9 @@ import org.bukkit.inventory.ItemStack;
  * /bank withdraw <amount>   - withdraws Crystals from your bank into your inventory
  * /bank gui                 - opens the visual Crystal Bank interface
  *
- * Normal players' bank balance is capped at 10,000 Crystals. OPs and
- * players holding the Finance Minister role have no cap.
+ * Normal players' bank balance is capped at 10,000 Crystals by default,
+ * unless individually raised via /increase limit. OPs and Finance
+ * Minister role holders have no cap.
  */
 public class BankCommand implements CommandExecutor {
 
@@ -83,7 +84,7 @@ public class BankCommand implements CommandExecutor {
             player.sendMessage(Component.text("Limit: Unlimited (Finance Minister/OP).", NamedTextColor.GOLD));
         } else {
             player.sendMessage(Component.text(
-                    "Limit: " + String.format("%,d", BankManager.NORMAL_PLAYER_CAP) + " Crystal(s).",
+                    "Limit: " + String.format("%,d", bankManager.getCap(player.getUniqueId())) + " Crystal(s).",
                     NamedTextColor.GRAY));
         }
     }
@@ -109,10 +110,11 @@ public class BankCommand implements CommandExecutor {
 
         boolean unlimited = bankGuiManager.isUnlimited(player);
         long currentBalance = bankManager.getBalance(player.getUniqueId());
+        long cap = bankManager.getCap(player.getUniqueId());
 
-        if (!unlimited && currentBalance >= BankManager.NORMAL_PLAYER_CAP) {
+        if (!unlimited && currentBalance >= cap) {
             player.sendMessage(Component.text(
-                    "Your bank is already at its " + String.format("%,d", BankManager.NORMAL_PLAYER_CAP)
+                    "Your bank is already at its " + String.format("%,d", cap)
                             + " Crystal limit.", NamedTextColor.RED));
             return;
         }
@@ -176,8 +178,6 @@ public class BankCommand implements CommandExecutor {
             return;
         }
 
-        // Delivers the FULL withdrawn amount: into inventory where it fits,
-        // dropped at the player's feet for any true overflow. Nothing is lost.
         CrystalItemUtil.giveCrystals(player, withdrawn);
 
         player.sendMessage(Component.text("Withdrew " + withdrawn + " Crystal(s) from your bank.",
@@ -216,4 +216,4 @@ public class BankCommand implements CommandExecutor {
             }
         }
     }
-        }
+                           }
