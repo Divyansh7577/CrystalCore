@@ -21,7 +21,6 @@ import java.util.UUID;
  */
 public class RankManager {
 
-    /** A pre-built role: a fixed display name + fixed color, identified by a stable key. */
     public static final class RoleDefinition {
         public final String key;
         public final String displayName;
@@ -34,7 +33,6 @@ public class RankManager {
         }
     }
 
-    /** Registry of every pre-built role the server supports. */
     private static final Map<String, RoleDefinition> PREDEFINED_ROLES = new LinkedHashMap<>();
 
     static {
@@ -44,7 +42,6 @@ public class RankManager {
                 new RoleDefinition("FINANCE_MINISTER", "Finance Minister", "#FFD700"));
     }
 
-    /** Looks up a predefined role by its display name (case-insensitive, spaces or underscores). */
     public static RoleDefinition findRoleByName(String input) {
         if (input == null || input.isEmpty()) {
             return null;
@@ -108,9 +105,12 @@ public class RankManager {
             ranksConfig = new YamlConfiguration();
         }
 
-        for (Map.Entry<UUID, String> entry : rankNames.entrySet()) {
-            UUID uuid = entry.getKey();
-            ranksConfig.set("ranks." + uuid + ".name", entry.getValue());
+        // Rebuild the whole "ranks" section from scratch so removed players
+        // (via clearRank) don't linger in the saved file.
+        ranksConfig.set("ranks", null);
+
+        for (UUID uuid : rankNames.keySet()) {
+            ranksConfig.set("ranks." + uuid + ".name", rankNames.get(uuid));
             ranksConfig.set("ranks." + uuid + ".color", rankColors.getOrDefault(uuid, "WHITE"));
             ranksConfig.set("ranks." + uuid + ".role", playerRoleKeys.getOrDefault(uuid, ""));
         }
@@ -122,7 +122,6 @@ public class RankManager {
         }
     }
 
-    /** Sets a custom rank name/color (used by /rank). Does not touch any role assignment. */
     public void setRank(OfflinePlayer target, String rankName, String colorInput) {
         UUID uuid = target.getUniqueId();
         rankNames.put(uuid, rankName);
@@ -130,7 +129,6 @@ public class RankManager {
         saveRanks();
     }
 
-    /** Assigns a pre-built role (e.g. Market Minister, Finance Minister) to a player. */
     public void assignRole(OfflinePlayer target, RoleDefinition role) {
         UUID uuid = target.getUniqueId();
         rankNames.put(uuid, role.displayName);
@@ -139,7 +137,20 @@ public class RankManager {
         saveRanks();
     }
 
-    /** Whether the player currently holds the given predefined role key (e.g. "MARKET_MINISTER"). */
+    /**
+     * Removes a player's rank entirely - clears their custom rank name/color
+     * AND any predefined role (Market Minister, Finance Minister, etc).
+     * Returns true if the player had anything to remove.
+     */
+    public boolean clearRank(UUID uuid) {
+        boolean hadSomething = rankNames.containsKey(uuid) || playerRoleKeys.containsKey(uuid);
+        rankNames.remove(uuid);
+        rankColors.remove(uuid);
+        playerRoleKeys.remove(uuid);
+        saveRanks();
+        return hadSomething;
+    }
+
     public boolean hasRole(UUID uuid, String roleKey) {
         return roleKey.equalsIgnoreCase(playerRoleKeys.get(uuid));
     }
@@ -189,4 +200,4 @@ public class RankManager {
         String name = getRankName(uuid);
         return Component.text("[" + name + "] ", color);
     }
-        }    
+            }
