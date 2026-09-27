@@ -6,9 +6,9 @@ import org.bukkit.entity.Player;
 
 /**
  * Resolves a player by name WITHOUT ever making a network call to Mojang.
- * Checks online players first, then this server's own local player cache
- * (populated purely from local data). Avoids the silent hangs/failures
- * that Bukkit.getOfflinePlayer(String) can trigger for uncached names.
+ * Checks online players first, then this server's own local player cache.
+ * Avoids the silent hangs/failures Bukkit.getOfflinePlayer(String) can
+ * trigger for uncached names.
  */
 public final class PlayerResolver {
 
@@ -35,4 +35,4 @@ public final class PlayerResolver {
 
         return null;
     }
-    }
+}
