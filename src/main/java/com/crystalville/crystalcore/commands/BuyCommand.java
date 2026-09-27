@@ -1,5 +1,7 @@
 package com.crystalville.crystalcore.commands;
 
+import com.crystalville.crystalcore.gui.BuyGuiManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
@@ -19,12 +21,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * /buy <item> <quantity>   - purchase items from the server shop using Crystals
- * /buy info <item>         - check an item's buy price without buying
+ * /buy <item> <quantity>   - purchase from the shop using Crystals
+ * /buy info <item>         - check an item's buy price
+ * /buy gui                 - opens a visual, paginated buy interface
  *
- * Purchasing is restricted to players holding the "Market Minister" role
- * (see RankManager / RoleCommand). OPs always bypass both the role check
- * and the Crystal cost, consistent with the rest of CrystalCore's economy.
+ * Restricted to Market Minister role or OP. OPs bypass the Crystal cost,
+ * UNLESS they've disabled it via /opbypass off.
  */
 public class BuyCommand implements CommandExecutor {
 
@@ -32,10 +34,15 @@ public class BuyCommand implements CommandExecutor {
 
     private final ShopManager shopManager;
     private final RankManager rankManager;
+    private final BuyGuiManager buyGuiManager;
+    private final OpBypassManager opBypassManager;
 
-    public BuyCommand(ShopManager shopManager, RankManager rankManager) {
+    public BuyCommand(ShopManager shopManager, RankManager rankManager, BuyGuiManager buyGuiManager,
+                       OpBypassManager opBypassManager) {
         this.shopManager = shopManager;
         this.rankManager = rankManager;
+        this.buyGuiManager = buyGuiManager;
+        this.opBypassManager = opBypassManager;
     }
 
     @Override
@@ -56,6 +63,11 @@ public class BuyCommand implements CommandExecutor {
             return true;
         }
 
+        if (args[0].equalsIgnoreCase("gui")) {
+            player.openInventory(buyGuiManager.open(player, 0));
+            return true;
+        }
+
         handlePurchase(player, args);
         return true;
     }
@@ -64,6 +76,7 @@ public class BuyCommand implements CommandExecutor {
         player.sendMessage(Component.text("Usage:", NamedTextColor.RED));
         player.sendMessage(Component.text("  /buy <item name> <quantity>", NamedTextColor.GRAY));
         player.sendMessage(Component.text("  /buy info <item name>", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("  /buy gui", NamedTextColor.GRAY));
     }
 
     private void handleInfo(Player player, String[] args) {
@@ -133,10 +146,11 @@ public class BuyCommand implements CommandExecutor {
             return;
         }
 
+        boolean bypass = opBypassManager.hasBypass(player);
         int buyPrice = shopManager.getBuyPrice(material);
         int totalCost = buyPrice * quantity;
 
-        if (!player.isOp()) {
+        if (!bypass) {
             int have = countCrystals(player.getInventory());
             if (have < totalCost) {
                 player.sendMessage(Component.text(
@@ -149,7 +163,7 @@ public class BuyCommand implements CommandExecutor {
 
         giveItems(player, material, quantity);
 
-        if (player.isOp()) {
+        if (bypass) {
             player.sendMessage(Component.text("[OP Bypass] ", NamedTextColor.GOLD)
                     .append(Component.text("Purchased " + quantity + "x " + prettyName(material)
                             + " for free.", NamedTextColor.GREEN)));
@@ -201,13 +215,6 @@ public class BuyCommand implements CommandExecutor {
         }
     }
 
-    /**
-     * BUGFIX: previously collected overflow into a Map<Integer, ItemStack>,
-     * whose keys always start at 0 on every addItem() call - each loop
-     * iteration's leftovers silently overwrote the previous iteration's,
-     * destroying items instead of dropping them once the inventory filled.
-     * Using a List here preserves every leftover stack correctly.
-     */
     private void giveItems(Player player, Material material, int amount) {
         int maxStack = material.getMaxStackSize();
         List<ItemStack> overflow = new ArrayList<>();
@@ -225,4 +232,4 @@ public class BuyCommand implements CommandExecutor {
             player.getWorld().dropItemNaturally(player.getLocation(), leftover);
         }
     }
-    }
+            }
