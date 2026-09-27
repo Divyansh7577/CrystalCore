@@ -6,6 +6,7 @@ import com.crystalville.crystalcore.managers.EnterpriseAccount;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
 import com.crystalville.crystalcore.managers.EnterprisePermission;
 import com.crystalville.crystalcore.managers.EnterpriseTransaction;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import com.crystalville.crystalcore.util.EnterpriseBookUtil;
@@ -39,13 +40,16 @@ public class EnterpriseCommand implements CommandExecutor {
     private final BankManager bankManager;
     private final RankManager rankManager;
     private final EnterpriseGuiManager enterpriseGuiManager;
+    private final OpBypassManager opBypassManager;
 
     public EnterpriseCommand(EnterpriseManager enterpriseManager, BankManager bankManager,
-                              RankManager rankManager, EnterpriseGuiManager enterpriseGuiManager) {
+                              RankManager rankManager, EnterpriseGuiManager enterpriseGuiManager,
+                              OpBypassManager opBypassManager) {
         this.enterpriseManager = enterpriseManager;
         this.bankManager = bankManager;
         this.rankManager = rankManager;
         this.enterpriseGuiManager = enterpriseGuiManager;
+        this.opBypassManager = opBypassManager;
     }
 
     @Override
@@ -62,47 +66,20 @@ public class EnterpriseCommand implements CommandExecutor {
         }
 
         switch (args[0].toLowerCase()) {
-            case "create":
-                handleCreate(player, args);
-                break;
-            case "info":
-                handleInfo(player, args);
-                break;
-            case "balance":
-                handleBalance(player, args);
-                break;
-            case "deposit":
-                handleDeposit(player, args);
-                break;
-            case "withdraw":
-                handleWithdraw(player, args);
-                break;
-            case "add":
-                handleAddMember(player, args);
-                break;
-            case "remove":
-                handleRemoveMember(player, args);
-                break;
-            case "setperms":
-                handleSetPermissions(player, args);
-                break;
-            case "members":
-                handleListMembers(player, args);
-                break;
-            case "history":
-                handleHistory(player, args);
-                break;
-            case "list":
-                handleList(player);
-                break;
-            case "increase":
-                handleIncrease(player, args);
-                break;
-            case "gui":
-                handleGui(player, args);
-                break;
-            default:
-                sendUsage(player);
+            case "create": handleCreate(player, args); break;
+            case "info": handleInfo(player, args); break;
+            case "balance": handleBalance(player, args); break;
+            case "deposit": handleDeposit(player, args); break;
+            case "withdraw": handleWithdraw(player, args); break;
+            case "add": handleAddMember(player, args); break;
+            case "remove": handleRemoveMember(player, args); break;
+            case "setperms": handleSetPermissions(player, args); break;
+            case "members": handleListMembers(player, args); break;
+            case "history": handleHistory(player, args); break;
+            case "list": handleList(player); break;
+            case "increase": handleIncrease(player, args); break;
+            case "gui": handleGui(player, args); break;
+            default: sendUsage(player);
         }
 
         return true;
@@ -224,7 +201,9 @@ public class EnterpriseCommand implements CommandExecutor {
         int amount = parsePositiveInt(player, args[2]);
         if (amount <= 0) return;
 
-        if (!player.isOp()) {
+        boolean bypass = opBypassManager.hasBypass(player);
+
+        if (!bypass) {
             int have = countCrystals(player.getInventory());
             if (have < amount) {
                 player.sendMessage(Component.text(
@@ -242,7 +221,7 @@ public class EnterpriseCommand implements CommandExecutor {
             return;
         }
 
-        if (!player.isOp()) {
+        if (!bypass) {
             removeCrystals(player.getInventory(), (int) added);
         }
 
@@ -651,7 +630,7 @@ public class EnterpriseCommand implements CommandExecutor {
 
         if (remainder <= 0) return;
 
-        boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        boolean unlimited = opBypassManager.hasBypass(player);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
         long stillOverflow = remainder - depositedToBank;
 
