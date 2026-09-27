@@ -2,10 +2,11 @@ package com.crystalville.crystalcore.commands;
 
 import com.crystalville.crystalcore.CrystalCore;
 import com.crystalville.crystalcore.managers.MailboxManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
+import com.crystalville.crystalcore.util.PlayerResolver;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,22 +17,18 @@ import org.bukkit.inventory.ItemStack;
 
 /**
  * /pay <player> <amount>
- *
- * Works regardless of receiver status:
- * - Online with space: Crystals go straight into their inventory.
- * - Offline: saved to their mailbox, delivered automatically (with a
- *   "who sent it" breakdown) the next time they join.
- * - Online but inventory full: saved as a claimable balance instead of
- *   being dropped on the ground. They collect it with /claim <amount>.
- *
- * OPs bypass their own inventory cost entirely (infinite send).
+ * Works regardless of receiver status (online/offline/full inventory).
+ * OPs bypass their own inventory cost, UNLESS they've disabled it via
+ * /opbypass off.
  */
 public class PayCommand implements CommandExecutor {
 
     private final CrystalCore plugin;
+    private final OpBypassManager opBypassManager;
 
-    public PayCommand(CrystalCore plugin) {
+    public PayCommand(CrystalCore plugin, OpBypassManager opBypassManager) {
         this.plugin = plugin;
+        this.opBypassManager = opBypassManager;
     }
 
     @Override
@@ -61,8 +58,8 @@ public class PayCommand implements CommandExecutor {
             return true;
         }
 
-        OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
-        if (target.getName() == null && !target.hasPlayedBefore()) {
+        OfflinePlayer target = PlayerResolver.resolve(args[0]);
+        if (target == null) {
             payer.sendMessage(Component.text(
                     "Player '" + args[0] + "' has never joined this server.", NamedTextColor.RED));
             return true;
@@ -73,7 +70,9 @@ public class PayCommand implements CommandExecutor {
             return true;
         }
 
-        if (!payer.isOp()) {
+        boolean bypass = opBypassManager.hasBypass(payer);
+
+        if (!bypass) {
             int have = countCrystals(payer.getInventory());
             if (have < amount) {
                 payer.sendMessage(Component.text(
@@ -108,7 +107,7 @@ public class PayCommand implements CommandExecutor {
             mailboxManager.addPending(target.getUniqueId(), payer.getName(), amount);
         }
 
-        if (payer.isOp()) {
+        if (bypass) {
             payer.sendMessage(Component.text("[OP Bypass] ", NamedTextColor.GOLD)
                     .append(Component.text("Sent " + amount + " Crystal(s) to " + args[0]
                             + " (unlimited, nothing deducted from your inventory).", NamedTextColor.GREEN)));
@@ -156,4 +155,4 @@ public class PayCommand implements CommandExecutor {
             }
         }
     }
-}
+            }
