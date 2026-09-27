@@ -2,7 +2,7 @@ package com.crystalville.crystalcore.commands;
 
 import com.crystalville.crystalcore.gui.SellGuiManager;
 import com.crystalville.crystalcore.managers.BankManager;
-import com.crystalville.crystalcore.managers.RankManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
@@ -18,28 +18,25 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Arrays;
 
 /**
- * /sell <item> <quantity>  - sell items from your inventory for Crystals
- * /sell info <item>        - check an item's sell price without selling
- * /sell gui                - opens a visual, paginated sell interface
+ * /sell <item> <quantity>  - sell items for Crystals
+ * /sell info <item>        - check sell price
+ * /sell gui                - visual, paginated sell interface
  *
- * Open to all players. If a sale's payout doesn't fully fit in the
- * player's inventory, the overflow is deposited into their Crystal Bank
- * (respecting the normal cap) instead of being dropped on the ground.
+ * If the payout doesn't fully fit in the inventory, overflow goes into
+ * the Crystal Bank (unlimited for OPs, UNLESS disabled via /opbypass off).
  */
 public class SellCommand implements CommandExecutor {
 
-    private static final String FINANCE_MINISTER_ROLE = "FINANCE_MINISTER";
-
     private final ShopManager shopManager;
     private final BankManager bankManager;
-    private final RankManager rankManager;
+    private final OpBypassManager opBypassManager;
     private final SellGuiManager sellGuiManager;
 
-    public SellCommand(ShopManager shopManager, BankManager bankManager, RankManager rankManager,
+    public SellCommand(ShopManager shopManager, BankManager bankManager, OpBypassManager opBypassManager,
                         SellGuiManager sellGuiManager) {
         this.shopManager = shopManager;
         this.bankManager = bankManager;
-        this.rankManager = rankManager;
+        this.opBypassManager = opBypassManager;
         this.sellGuiManager = sellGuiManager;
     }
 
@@ -173,7 +170,7 @@ public class SellCommand implements CommandExecutor {
             return;
         }
 
-        boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        boolean unlimited = opBypassManager.hasBypass(player);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
         long stillOverflow = remainder - depositedToBank;
 
@@ -232,4 +229,4 @@ public class SellCommand implements CommandExecutor {
             }
         }
     }
-                }
+}
