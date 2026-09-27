@@ -3,6 +3,7 @@ package com.crystalville.crystalcore.commands;
 import com.crystalville.crystalcore.managers.EnterpriseAccount;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
 import com.crystalville.crystalcore.managers.EnterprisePermission;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -20,16 +21,17 @@ import java.util.UUID;
 
 /**
  * /payenterprise <EnterpriseID> <amount>
- * Pays an Enterprise Bank directly (UPI-style), instantly. Open to every
- * player. OPs bypass their own inventory cost. The Enterprise's balance
- * cap (default 200,000, raisable via /enterprise increase) always applies.
+ * Pays an Enterprise Bank directly, instantly. OPs bypass their own
+ * inventory cost, UNLESS disabled via /opbypass off.
  */
 public class PayEnterpriseCommand implements CommandExecutor {
 
     private final EnterpriseManager enterpriseManager;
+    private final OpBypassManager opBypassManager;
 
-    public PayEnterpriseCommand(EnterpriseManager enterpriseManager) {
+    public PayEnterpriseCommand(EnterpriseManager enterpriseManager, OpBypassManager opBypassManager) {
         this.enterpriseManager = enterpriseManager;
+        this.opBypassManager = opBypassManager;
     }
 
     @Override
@@ -75,7 +77,9 @@ public class PayEnterpriseCommand implements CommandExecutor {
             return true;
         }
 
-        if (!player.isOp()) {
+        boolean bypass = opBypassManager.hasBypass(player);
+
+        if (!bypass) {
             int have = countCrystals(player.getInventory());
             if (have < amount) {
                 player.sendMessage(Component.text(
@@ -90,7 +94,7 @@ public class PayEnterpriseCommand implements CommandExecutor {
         account.addTransaction(player.getName(), "PAYMENT", amount);
         enterpriseManager.save();
 
-        if (player.isOp()) {
+        if (bypass) {
             player.sendMessage(Component.text("[OP Bypass] ", NamedTextColor.GOLD)
                     .append(Component.text("Paid " + amount + " Crystal(s) to " + account.name
                             + " (unlimited, nothing deducted from your inventory).", NamedTextColor.GREEN)));
@@ -150,4 +154,4 @@ public class PayEnterpriseCommand implements CommandExecutor {
             }
         }
     }
-                }
+            }
