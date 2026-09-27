@@ -3,7 +3,7 @@ package com.crystalville.crystalcore.listeners;
 import com.crystalville.crystalcore.gui.SellGuiHolder;
 import com.crystalville.crystalcore.gui.SellGuiManager;
 import com.crystalville.crystalcore.managers.BankManager;
-import com.crystalville.crystalcore.managers.RankManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
@@ -19,19 +19,17 @@ import org.bukkit.inventory.ItemStack;
 
 public class SellGuiListener implements Listener {
 
-    private static final String FINANCE_MINISTER_ROLE = "FINANCE_MINISTER";
-
     private final SellGuiManager sellGuiManager;
     private final ShopManager shopManager;
     private final BankManager bankManager;
-    private final RankManager rankManager;
+    private final OpBypassManager opBypassManager;
 
     public SellGuiListener(SellGuiManager sellGuiManager, ShopManager shopManager,
-                            BankManager bankManager, RankManager rankManager) {
+                            BankManager bankManager, OpBypassManager opBypassManager) {
         this.sellGuiManager = sellGuiManager;
         this.shopManager = shopManager;
         this.bankManager = bankManager;
-        this.rankManager = rankManager;
+        this.opBypassManager = opBypassManager;
     }
 
     @EventHandler
@@ -100,7 +98,7 @@ public class SellGuiListener implements Listener {
         }
         if (remainder <= 0) return;
 
-        boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        boolean unlimited = opBypassManager.hasBypass(player);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
         long stillOverflow = remainder - depositedToBank;
 
@@ -149,4 +147,4 @@ public class SellGuiListener implements Listener {
             }
         }
     }
-                                          }
+        }
