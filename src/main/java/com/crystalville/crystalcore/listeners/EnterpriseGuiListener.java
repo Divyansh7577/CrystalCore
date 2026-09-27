@@ -7,7 +7,7 @@ import com.crystalville.crystalcore.managers.EnterpriseAccount;
 import com.crystalville.crystalcore.managers.EnterpriseManager;
 import com.crystalville.crystalcore.managers.EnterprisePermission;
 import com.crystalville.crystalcore.managers.EnterpriseTransaction;
-import com.crystalville.crystalcore.managers.RankManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.util.CrystalItemUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -32,20 +32,19 @@ import java.util.Map;
 
 public class EnterpriseGuiListener implements Listener {
 
-    private static final String FINANCE_MINISTER_ROLE = "FINANCE_MINISTER";
     private static final SimpleDateFormat TIME_FORMAT = new SimpleDateFormat("dd/MM HH:mm");
 
     private final EnterpriseGuiManager guiManager;
     private final EnterpriseManager enterpriseManager;
     private final BankManager bankManager;
-    private final RankManager rankManager;
+    private final OpBypassManager opBypassManager;
 
     public EnterpriseGuiListener(EnterpriseGuiManager guiManager, EnterpriseManager enterpriseManager,
-                                  BankManager bankManager, RankManager rankManager) {
+                                  BankManager bankManager, OpBypassManager opBypassManager) {
         this.guiManager = guiManager;
         this.enterpriseManager = enterpriseManager;
         this.bankManager = bankManager;
-        this.rankManager = rankManager;
+        this.opBypassManager = opBypassManager;
     }
 
     @EventHandler
@@ -254,7 +253,7 @@ public class EnterpriseGuiListener implements Listener {
         }
         if (remainder <= 0) return;
 
-        boolean unlimited = player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        boolean unlimited = opBypassManager.hasBypass(player);
         long depositedToBank = bankManager.deposit(player.getUniqueId(), remainder, unlimited);
         long stillOverflow = remainder - depositedToBank;
 
@@ -268,4 +267,4 @@ public class EnterpriseGuiListener implements Listener {
                     + " Crystal(s) were dropped at your feet.", NamedTextColor.YELLOW));
         }
     }
-  }
+                         }
