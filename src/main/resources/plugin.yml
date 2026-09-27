@@ -1,9 +1,9 @@
 name: CrystalCore
-version: 1.11.0
+version: 1.13.0
 main: com.crystalville.crystalcore.CrystalCore
 api-version: '1.20'
 author: Divyansh7577
-description: Core plugin for Crystal Ville SMP - Crystal economy, personal and Enterprise banking, shop, roles, anti-theft chest logging, hole filler, HUD, and 3D Logo holograms.
+description: Core plugin for Crystal Ville SMP - Crystal economy, personal and Enterprise banking, shop, roles, anti-theft chest logging, hole filler, HUD, math calculator, OP Bypass toggle, and 3D Logo holograms.
 
 commands:
   pay:
@@ -12,8 +12,8 @@ commands:
     permission: crystalcore.pay
     permission-message: "&cYou don't have permission to use /pay."
   buy:
-    description: Buy items from the shop (Market Minister only) or check prices.
-    usage: /buy <item> <quantity>  |  /buy info <item>
+    description: Buy items from the shop (Market Minister only), check prices, or use the visual buy menu.
+    usage: /buy <item> <quantity>  |  /buy info <item>  |  /buy gui
     permission: crystalcore.buy
     permission-message: "&cYou don't have permission to use /buy."
   sell:
@@ -22,8 +22,8 @@ commands:
     permission: crystalcore.sell
     permission-message: "&cYou don't have permission to use /sell."
   rank:
-    description: Set a player's custom rank name and color. OP only.
-    usage: /rank <player> <rankname> <colour>
+    description: Set or remove a player's custom rank name and color. OP only.
+    usage: /rank <player> <rankname> <colour>  |  /rank remove <player>
     permission: crystalcore.rank
     permission-message: "&cOnly OPs can use /rank."
   role:
@@ -106,6 +106,16 @@ commands:
     usage: /issue guide <EnterpriseID>
     permission: crystalcore.issue
     permission-message: "&cYou don't have permission to use /issue."
+  math:
+    description: Evaluate a mathematical expression in-game.
+    usage: /math <expression>
+    permission: crystalcore.math
+    permission-message: "&cYou don't have permission to use /math."
+  opbypass:
+    description: Toggle your own OP Bypass (unlimited Crystals/items) on or off. OP only.
+    usage: /opbypass  |  /opbypass on|off|status
+    permission: crystalcore.opbypass
+    permission-message: "&cOnly OPs can use /opbypass."
 
 permissions:
   crystalcore.pay:
@@ -148,3 +158,7 @@ permissions:
     default: true
   crystalcore.issue:
     default: true
+  crystalcore.math:
+    default: true
+  crystalcore.opbypass:
+    default: op
