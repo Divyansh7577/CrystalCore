@@ -13,6 +13,8 @@ import com.crystalville.crystalcore.commands.InspectCommand;
 import com.crystalville.crystalcore.commands.InventoryCommand;
 import com.crystalville.crystalcore.commands.IssueGuideCommand;
 import com.crystalville.crystalcore.commands.LogoCommand;
+import com.crystalville.crystalcore.commands.MathCommand;
+import com.crystalville.crystalcore.commands.OpBypassCommand;
 import com.crystalville.crystalcore.commands.PayCommand;
 import com.crystalville.crystalcore.commands.PayEnterpriseCommand;
 import com.crystalville.crystalcore.commands.RankCommand;
@@ -21,10 +23,12 @@ import com.crystalville.crystalcore.commands.WebLinkCommand;
 import com.crystalville.crystalcore.commands.SellCommand;
 import com.crystalville.crystalcore.commands.ShopCommand;
 import com.crystalville.crystalcore.gui.BankGuiManager;
+import com.crystalville.crystalcore.gui.BuyGuiManager;
 import com.crystalville.crystalcore.gui.EnterpriseGuiManager;
 import com.crystalville.crystalcore.gui.SellGuiManager;
 import com.crystalville.crystalcore.listeners.AntiTheftListener;
 import com.crystalville.crystalcore.listeners.BankGuiListener;
+import com.crystalville.crystalcore.listeners.BuyGuiListener;
 import com.crystalville.crystalcore.listeners.CrystalListener;
 import com.crystalville.crystalcore.listeners.EnterpriseGuiListener;
 import com.crystalville.crystalcore.listeners.HoleFillerListener;
@@ -38,6 +42,7 @@ import com.crystalville.crystalcore.managers.HoleFillerManager;
 import com.crystalville.crystalcore.managers.HudManager;
 import com.crystalville.crystalcore.managers.InspectorManager;
 import com.crystalville.crystalcore.managers.MailboxManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.managers.StatsManager;
@@ -64,6 +69,8 @@ public final class CrystalCore extends JavaPlugin {
     private EnterpriseManager enterpriseManager;
     private EnterpriseGuiManager enterpriseGuiManager;
     private SellGuiManager sellGuiManager;
+    private BuyGuiManager buyGuiManager;
+    private OpBypassManager opBypassManager;
     private HudListener hudListener;
     private Material payCurrency;
     private Material buyCurrency;
@@ -107,10 +114,13 @@ public final class CrystalCore extends JavaPlugin {
 
         this.webStatsSyncManager = new WebStatsSyncManager(this);
 
+        this.opBypassManager = new OpBypassManager(this);
+        this.opBypassManager.load();
+
         this.bankManager = new BankManager(this);
         this.bankManager.load();
 
-        this.bankGuiManager = new BankGuiManager(bankManager, rankManager);
+        this.bankGuiManager = new BankGuiManager(bankManager, rankManager, opBypassManager);
 
         this.enterpriseManager = new EnterpriseManager(this);
         this.enterpriseManager.load();
@@ -118,6 +128,8 @@ public final class CrystalCore extends JavaPlugin {
         this.enterpriseGuiManager = new EnterpriseGuiManager();
 
         this.sellGuiManager = new SellGuiManager(shopManager);
+
+        this.buyGuiManager = new BuyGuiManager(shopManager);
 
         this.hudListener = new HudListener(
                 this,
@@ -128,9 +140,9 @@ public final class CrystalCore extends JavaPlugin {
                 bankManager
         );
 
-        getCommand("pay").setExecutor(new PayCommand(this));
-        getCommand("buy").setExecutor(new BuyCommand(shopManager, rankManager));
-        getCommand("sell").setExecutor(new SellCommand(shopManager, bankManager, rankManager, sellGuiManager));
+        getCommand("pay").setExecutor(new PayCommand(this, opBypassManager));
+        getCommand("buy").setExecutor(new BuyCommand(shopManager, rankManager, buyGuiManager, opBypassManager));
+        getCommand("sell").setExecutor(new SellCommand(shopManager, bankManager, opBypassManager, sellGuiManager));
         getCommand("rank").setExecutor(new RankCommand(this, rankManager));
         getCommand("role").setExecutor(new RoleCommand(rankManager));
         getCommand("logo").setExecutor(new LogoCommand());
@@ -144,11 +156,13 @@ public final class CrystalCore extends JavaPlugin {
         getCommand("edit").setExecutor(new EditHudCommand(hudManager, hudListener));
         getCommand("cvlink").setExecutor(new WebLinkCommand(this));
         getCommand("bank").setExecutor(new BankCommand(bankManager, bankGuiManager));
-        getCommand("enterprise").setExecutor(
-                new EnterpriseCommand(enterpriseManager, bankManager, rankManager, enterpriseGuiManager));
-        getCommand("payenterprise").setExecutor(new PayEnterpriseCommand(enterpriseManager));
+        getCommand("enterprise").setExecutor(new EnterpriseCommand(
+                enterpriseManager, bankManager, rankManager, enterpriseGuiManager, opBypassManager));
+        getCommand("payenterprise").setExecutor(new PayEnterpriseCommand(enterpriseManager, opBypassManager));
         getCommand("increase").setExecutor(new IncreaseLimitCommand(bankManager, rankManager));
         getCommand("issue").setExecutor(new IssueGuideCommand(enterpriseManager));
+        getCommand("math").setExecutor(new MathCommand());
+        getCommand("opbypass").setExecutor(new OpBypassCommand(opBypassManager));
 
         getServer().getPluginManager().registerEvents(
                 new CrystalListener(rankManager, mailboxManager),
@@ -167,10 +181,12 @@ public final class CrystalCore extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(hudListener, this);
         getServer().getPluginManager().registerEvents(new BankGuiListener(bankGuiManager, bankManager), this);
-        getServer().getPluginManager().registerEvents(
-                new EnterpriseGuiListener(enterpriseGuiManager, enterpriseManager, bankManager, rankManager), this);
-        getServer().getPluginManager().registerEvents(
-                new SellGuiListener(sellGuiManager, shopManager, bankManager, rankManager), this);
+        getServer().getPluginManager().registerEvents(new EnterpriseGuiListener(
+                enterpriseGuiManager, enterpriseManager, bankManager, opBypassManager), this);
+        getServer().getPluginManager().registerEvents(new SellGuiListener(
+                sellGuiManager, shopManager, bankManager, opBypassManager), this);
+        getServer().getPluginManager().registerEvents(new BuyGuiListener(
+                buyGuiManager, shopManager, rankManager, opBypassManager), this);
 
         if (getConfig().getBoolean("rename-amethyst-to-crystal", true)) {
             long interval = getConfig().getLong(
@@ -252,6 +268,10 @@ public final class CrystalCore extends JavaPlugin {
             enterpriseManager.save();
         }
 
+        if (opBypassManager != null) {
+            opBypassManager.save();
+        }
+
         getLogger().info("CrystalCore has been disabled.");
     }
 
@@ -287,7 +307,11 @@ public final class CrystalCore extends JavaPlugin {
         return enterpriseManager;
     }
 
+    public OpBypassManager getOpBypassManager() {
+        return opBypassManager;
+    }
+
     public Material getBuyCurrency() {
         return buyCurrency;
     }
-    }
+}
