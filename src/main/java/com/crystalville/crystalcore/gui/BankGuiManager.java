@@ -1,6 +1,7 @@
 package com.crystalville.crystalcore.gui;
 
 import com.crystalville.crystalcore.managers.BankManager;
+import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.RankManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -29,14 +30,17 @@ public final class BankGuiManager {
 
     private final BankManager bankManager;
     private final RankManager rankManager;
+    private final OpBypassManager opBypassManager;
 
-    public BankGuiManager(BankManager bankManager, RankManager rankManager) {
+    public BankGuiManager(BankManager bankManager, RankManager rankManager, OpBypassManager opBypassManager) {
         this.bankManager = bankManager;
         this.rankManager = rankManager;
+        this.opBypassManager = opBypassManager;
     }
 
+    /** Unlimited if: an OP with bypass currently enabled, OR holding Finance Minister (role, not OP-tied). */
     public boolean isUnlimited(Player player) {
-        return player.isOp() || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
+        return opBypassManager.hasBypass(player) || rankManager.hasRole(player.getUniqueId(), FINANCE_MINISTER_ROLE);
     }
 
     public Inventory open(Player player) {
