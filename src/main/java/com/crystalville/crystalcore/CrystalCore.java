@@ -13,11 +13,13 @@ import com.crystalville.crystalcore.commands.InspectCommand;
 import com.crystalville.crystalcore.commands.InventoryCommand;
 import com.crystalville.crystalcore.commands.IssueGuideCommand;
 import com.crystalville.crystalcore.commands.LogoCommand;
+import com.crystalville.crystalcore.commands.MakeCommand;
 import com.crystalville.crystalcore.commands.MathCommand;
 import com.crystalville.crystalcore.commands.OpBypassCommand;
 import com.crystalville.crystalcore.commands.PayCommand;
 import com.crystalville.crystalcore.commands.PayEnterpriseCommand;
 import com.crystalville.crystalcore.commands.RankCommand;
+import com.crystalville.crystalcore.commands.RedeemCommand;
 import com.crystalville.crystalcore.commands.RoleCommand;
 import com.crystalville.crystalcore.commands.WebLinkCommand;
 import com.crystalville.crystalcore.commands.SellCommand;
@@ -44,6 +46,7 @@ import com.crystalville.crystalcore.managers.InspectorManager;
 import com.crystalville.crystalcore.managers.MailboxManager;
 import com.crystalville.crystalcore.managers.OpBypassManager;
 import com.crystalville.crystalcore.managers.RankManager;
+import com.crystalville.crystalcore.managers.RedeemCodeManager;
 import com.crystalville.crystalcore.managers.ShopManager;
 import com.crystalville.crystalcore.managers.StatsManager;
 import com.crystalville.crystalcore.managers.WebStatsSyncManager;
@@ -71,6 +74,7 @@ public final class CrystalCore extends JavaPlugin {
     private SellGuiManager sellGuiManager;
     private BuyGuiManager buyGuiManager;
     private OpBypassManager opBypassManager;
+    private RedeemCodeManager redeemCodeManager;
     private HudListener hudListener;
     private Material payCurrency;
     private Material buyCurrency;
@@ -131,6 +135,9 @@ public final class CrystalCore extends JavaPlugin {
 
         this.buyGuiManager = new BuyGuiManager(shopManager);
 
+        this.redeemCodeManager = new RedeemCodeManager(this);
+        this.redeemCodeManager.load();
+
         this.hudListener = new HudListener(
                 this,
                 hudManager,
@@ -163,6 +170,8 @@ public final class CrystalCore extends JavaPlugin {
         getCommand("issue").setExecutor(new IssueGuideCommand(enterpriseManager));
         getCommand("math").setExecutor(new MathCommand());
         getCommand("opbypass").setExecutor(new OpBypassCommand(opBypassManager));
+        getCommand("make").setExecutor(new MakeCommand(redeemCodeManager));
+        getCommand("redeem").setExecutor(new RedeemCommand(redeemCodeManager));
 
         getServer().getPluginManager().registerEvents(
                 new CrystalListener(rankManager, mailboxManager),
@@ -272,6 +281,10 @@ public final class CrystalCore extends JavaPlugin {
             opBypassManager.save();
         }
 
+        if (redeemCodeManager != null) {
+            redeemCodeManager.save();
+        }
+
         getLogger().info("CrystalCore has been disabled.");
     }
 
@@ -314,4 +327,4 @@ public final class CrystalCore extends JavaPlugin {
     public Material getBuyCurrency() {
         return buyCurrency;
     }
-}
+    }
