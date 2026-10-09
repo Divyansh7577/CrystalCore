@@ -1,9 +1,9 @@
 name: CrystalCore
-version: 1.13.0
+version: 1.14.0
 main: com.crystalville.crystalcore.CrystalCore
 api-version: '1.20'
 author: Divyansh7577
-description: Core plugin for Crystal Ville SMP - Crystal economy, personal and Enterprise banking, shop, roles, anti-theft chest logging, hole filler, HUD, math calculator, OP Bypass toggle, and 3D Logo holograms.
+description: Core plugin for Crystal Ville SMP - Crystal economy, personal and Enterprise banking, redeem codes, shop, roles, anti-theft chest logging, hole filler, HUD, math calculator, OP Bypass toggle, and 3D Logo holograms.
 
 commands:
   pay:
@@ -116,6 +116,16 @@ commands:
     usage: /opbypass  |  /opbypass on|off|status
     permission: crystalcore.opbypass
     permission-message: "&cOnly OPs can use /opbypass."
+  make:
+    description: Create a redeem code worth a set amount of Crystals, with an optional expiration. OP only.
+    usage: /make <code> <amount> <expiration minutes>  |  /make <code> <amount> infinite
+    permission: crystalcore.make
+    permission-message: "&cOnly OPs can use /make."
+  redeem:
+    description: Claim a redeem code for Crystals (once per player).
+    usage: /redeem <code>
+    permission: crystalcore.redeem
+    permission-message: "&cYou don't have permission to use /redeem."
 
 permissions:
   crystalcore.pay:
@@ -162,3 +172,7 @@ permissions:
     default: true
   crystalcore.opbypass:
     default: op
+  crystalcore.make:
+    default: op
+  crystalcore.redeem:
+    default: true
